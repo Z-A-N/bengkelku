@@ -28,10 +28,7 @@ class _SplashScreenState extends State<SplashScreen>
       curve: Curves.easeOutBack,
     );
 
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
 
     _controller.forward();
 
@@ -48,6 +45,14 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Shader linearGradient(List<Color> colors) {
+    return LinearGradient(
+      colors: colors,
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0));
   }
 
   @override
@@ -72,58 +77,89 @@ class _SplashScreenState extends State<SplashScreen>
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // 🔹 "Bengkel" (outline kuning, isi merah muda)
+                  // ✨ BENGKEL (outline kuning, isi gradient merah glossy)
                   Stack(
                     children: [
                       Text(
                         'Bengkel',
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: 34,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
                           foreground: Paint()
                             ..style = PaintingStyle.stroke
                             ..strokeWidth = 3
-                            ..color = const Color(0xFFE4A70A), // outline kuning
+                            ..color = const Color.fromARGB(246, 248, 204, 28), // outline kuning
                         ),
                       ),
-                      const Text(
+                      Text(
                         'Bengkel',
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: 34,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
-                          color: Color(0xFFE21B4D), // isi merah muda
+                          foreground: Paint()
+                            ..shader = linearGradient([
+                              const Color.fromARGB(
+                                255,
+                                247,
+                                75,
+                                106,
+                              ), // merah muda terang
+                              const Color(0xFFE21B4D), // merah figma
+                              const Color(0xFFC0103A), // merah tua bawah
+                            ]),
+                          shadows: const [
+                            Shadow(
+                              offset: Offset(1, 2),
+                              blurRadius: 3,
+                              color: Color(0x33000000),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  // 🔹 "Ku." (outline merah tua, isi kuning terang)
+                  // ✨ KU. (outline merah tua, isi gradient kuning glossy)
                   Stack(
                     children: [
                       Text(
                         'Ku.',
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: 34,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
                           foreground: Paint()
                             ..style = PaintingStyle.stroke
                             ..strokeWidth = 3
-                            ..color = const Color(0xFFB01D1D), // outline merah tua
+                            ..color = const Color(
+                              0xFFB01D1D,
+                            ), // outline merah tua
                         ),
                       ),
-                      const Text(
+                      Text(
                         'Ku.',
                         style: TextStyle(
-                          fontSize: 32,
+                          fontSize: 34,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
-                          color: Color(0xFFFFD320), // isi kuning terang
+                          foreground: Paint()
+                            ..shader = linearGradient([
+                              const Color(0xFFFFF799), // kuning pucat atas
+                              const Color(0xFFFFD320), // kuning utama
+                              const Color(0xFFF9B700), // kuning keemasan bawah
+                            ]),
+                          shadows: const [
+                            Shadow(
+                              offset: Offset(1, 2),
+                              blurRadius: 3,
+                              color: Color(0x33000000),
+                            ),
+                          ],
                         ),
                       ),
                     ],
