@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'onboarding_screen.dart';
+import 'onboarding_screen.dart'; // ganti tujuan navigasinya
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,15 +28,13 @@ class _SplashScreenState extends State<SplashScreen>
       curve: Curves.easeOutBack,
     );
 
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeIn,
-    );
+    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
 
     _controller.forward();
 
+    // Setelah animasi selesai, pindah ke onboarding
     Future.delayed(const Duration(seconds: 3), () {
-      if (!mounted) return;
+      if (!mounted) return; // <- tambahkan ini
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),
@@ -68,51 +66,25 @@ class _SplashScreenState extends State<SplashScreen>
             const SizedBox(height: 20),
             FadeTransition(
               opacity: _fadeAnimation,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Outline layer (pinggiran)
-                  Text(
-                    'BengkelKu',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Poppins',
-                      foreground: Paint()
-                        ..style = PaintingStyle.stroke
-                        ..strokeWidth = 3
-                        ..color = const Color(0x33000000), // bayangan lembut
-                    ),
+              child: RichText(
+                text: const TextSpan(
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Poppins',
+                    letterSpacing: 1.2,
                   ),
-                  // Main colored text
-                  RichText(
-                    text: const TextSpan(
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
-                        letterSpacing: 1.2,
-                        shadows: [
-                          Shadow(
-                            offset: Offset(1, 2),
-                            blurRadius: 4,
-                            color: Color(0x22000000),
-                          ),
-                        ],
-                      ),
-                      children: [
-                        TextSpan(
-                          text: 'Bengkel',
-                          style: TextStyle(color: Color(0xFFB01D1D)),
-                        ),
-                        TextSpan(
-                          text: 'Ku',
-                          style: TextStyle(color: Color(0xFFE4A70A)),
-                        ),
-                      ],
+                  children: [
+                    TextSpan(
+                      text: 'Bengkel',
+                      style: TextStyle(color: Color(0xFFB01D1D)),
                     ),
-                  ),
-                ],
+                    TextSpan(
+                      text: 'Ku',
+                      style: TextStyle(color: Color(0xFFE4A70A)),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
