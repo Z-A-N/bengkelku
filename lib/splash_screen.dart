@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'onboarding_screen.dart'; // ganti tujuan navigasinya
+import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -28,13 +28,15 @@ class _SplashScreenState extends State<SplashScreen>
       curve: Curves.easeOutBack,
     );
 
-    _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeIn,
+    );
 
     _controller.forward();
 
-    // Setelah animasi selesai, pindah ke onboarding
     Future.delayed(const Duration(seconds: 3), () {
-      if (!mounted) return; // <- tambahkan ini
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const OnboardingScreen()),
@@ -66,25 +68,67 @@ class _SplashScreenState extends State<SplashScreen>
             const SizedBox(height: 20),
             FadeTransition(
               opacity: _fadeAnimation,
-              child: RichText(
-                text: const TextSpan(
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: 'Poppins',
-                    letterSpacing: 1.2,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // 🔹 "Bengkel" (outline kuning, isi merah muda)
+                  Stack(
+                    children: [
+                      Text(
+                        'Bengkel',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Poppins',
+                          letterSpacing: 1.2,
+                          foreground: Paint()
+                            ..style = PaintingStyle.stroke
+                            ..strokeWidth = 3
+                            ..color = const Color(0xFFE4A70A), // outline kuning
+                        ),
+                      ),
+                      const Text(
+                        'Bengkel',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Poppins',
+                          letterSpacing: 1.2,
+                          color: Color(0xFFE21B4D), // isi merah muda
+                        ),
+                      ),
+                    ],
                   ),
-                  children: [
-                    TextSpan(
-                      text: 'Bengkel',
-                      style: TextStyle(color: Color(0xFFB01D1D)),
-                    ),
-                    TextSpan(
-                      text: 'Ku',
-                      style: TextStyle(color: Color(0xFFE4A70A)),
-                    ),
-                  ],
-                ),
+                  // 🔹 "Ku." (outline merah tua, isi kuning terang)
+                  Stack(
+                    children: [
+                      Text(
+                        'Ku.',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Poppins',
+                          letterSpacing: 1.2,
+                          foreground: Paint()
+                            ..style = PaintingStyle.stroke
+                            ..strokeWidth = 3
+                            ..color = const Color(0xFFB01D1D), // outline merah tua
+                        ),
+                      ),
+                      const Text(
+                        'Ku.',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Poppins',
+                          letterSpacing: 1.2,
+                          color: Color(0xFFFFD320), // isi kuning terang
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
