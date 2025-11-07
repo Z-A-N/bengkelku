@@ -36,7 +36,19 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const OnboardingScreen()),
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 800),
+          pageBuilder: (_, __, ___) => const OnboardingScreen(),
+          transitionsBuilder: (_, animation, __, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeInOut,
+              ),
+              child: child,
+            );
+          },
+        ),
       );
     });
   }
@@ -90,7 +102,12 @@ class _SplashScreenState extends State<SplashScreen>
                           foreground: Paint()
                             ..style = PaintingStyle.stroke
                             ..strokeWidth = 3
-                            ..color = const Color.fromARGB(246, 248, 203, 25), // outline kuning
+                            ..color = const Color.fromARGB(
+                              246,
+                              248,
+                              203,
+                              25,
+                            ), // outline kuning
                         ),
                       ),
                       Text(
@@ -102,7 +119,12 @@ class _SplashScreenState extends State<SplashScreen>
                           letterSpacing: 1.2,
                           foreground: Paint()
                             ..shader = linearGradient([
-                              const Color.fromARGB(255, 231, 56, 88), // merah muda terang
+                              const Color.fromARGB(
+                                255,
+                                231,
+                                56,
+                                88,
+                              ), // merah muda terang
                               const Color(0xFFE21B4D), // merah figma
                               const Color(0xFFC0103A), // merah tua bawah
                             ]),

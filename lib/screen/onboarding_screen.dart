@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'home_page.dart';
+import 'auth/login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -291,6 +291,7 @@ class _SunrisePainter extends CustomPainter {
           const Color(0xFFFFF59D),
           const Color(0xFFFFEE58),
           const Color.fromARGB(60, 255, 214, 64),
+          // ignore: deprecated_member_use
           Colors.white.withOpacity(0.0),
         ],
         stops: const [0.0, 0.3, 0.6, 1.0],
