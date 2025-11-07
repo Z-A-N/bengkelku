@@ -50,7 +50,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _startAutoSlide();
   }
 
-  // 🔁 Auto slide dengan looping arah kiri dan efek fade
   void _startAutoSlide() {
     _autoSlideTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
       if (!_controller.hasClients) return;
@@ -58,7 +57,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       int nextPage = _currentPage + 1;
 
       if (nextPage >= onboardingData.length) {
-        // Fade out saat mau balik ke awal
         await _fadeController.forward();
         await _controller.animateToPage(
           0,
@@ -92,7 +90,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  // Tombol "Lewati" → langsung ke slide terakhir + efek fade
   Future<void> _goToLastSlideWithFade() async {
     await _fadeController.forward();
     await _controller.animateToPage(
@@ -112,9 +109,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       body: SafeArea(
         child: Stack(
           children: [
+            // 🌅 Ornamen bawah (matahari terbit)
             const BottomHalfCircleOrnament(),
 
-            // 🔷 Konten utama onboarding
             FadeTransition(
               opacity: _fadeAnimation.drive(Tween(begin: 1.0, end: 0.6)),
               child: Column(
@@ -204,7 +201,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
                   const SizedBox(height: 25),
 
-                  // 🔸 Tombol CTA (hanya di halaman terakhir)
+                  // 🔸 Tombol CTA (halaman terakhir)
                   if (_currentPage == onboardingData.length - 1)
                     Padding(
                       padding: const EdgeInsets.fromLTRB(80, 0, 80, 45),
@@ -223,7 +220,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFFFD320),
+                            color: Color.fromARGB(255, 255, 255, 255),
                           ),
                         ),
                       ),
@@ -234,7 +231,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
 
-            // 🔹 Tombol "Lewati" dengan efek fade
+            // 🔹 Tombol Lewati
             if (_currentPage != onboardingData.length - 1)
               Positioned(
                 right: 20,
@@ -258,43 +255,52 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-// ☀️ Ornamen setengah lingkaran (hiasan bawah)
+// 🌅 Ornamen bawah seperti matahari terbit (gradasi kuning)
 class BottomHalfCircleOrnament extends StatelessWidget {
   const BottomHalfCircleOrnament({super.key});
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final double baseWidth = size.width;
+    final double diameter = size.width * 1.6;
 
     return Align(
       alignment: Alignment.bottomCenter,
       child: SizedBox(
         width: double.infinity,
-        height: size.height * 0.35,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
-            _circle(baseWidth * 1.6, baseWidth * 0.8, const Color(0xFFFFF8DE)),
-            _circle(baseWidth * 1.3, baseWidth * 0.65, const Color(0xFFFFE581)),
-            _circle(baseWidth * 1.0, baseWidth * 0.5, const Color(0xFFFFD320)),
-          ],
-        ),
+        height: size.height * 0.4,
+        child: CustomPaint(painter: _SunrisePainter(diameter)),
       ),
     );
+  }
+}
+
+class _SunrisePainter extends CustomPainter {
+  final double diameter;
+  _SunrisePainter(this.diameter);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final Offset center = Offset(size.width / 2, size.height);
+    final Rect rect = Rect.fromCircle(center: center, radius: diameter / 2);
+
+    final Paint paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFFFF59D), // kuning lembut
+          const Color(0xFFFFEE58), // kuning terang
+          const Color.fromARGB(60, 255, 214, 64), // kuning keemasan
+          // ignore: deprecated_member_use
+          Colors.white.withOpacity(0.0), // fade ke transparan
+        ],
+        stops: const [0.0, 0.3, 0.6, 1.0],
+        center: Alignment.bottomCenter,
+        radius: 1.0,
+      ).createShader(rect);
+
+    canvas.drawCircle(center, diameter / 2, paint);
   }
 
-  Widget _circle(double width, double height, Color color) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(9999),
-          topRight: Radius.circular(9999),
-        ),
-      ),
-    );
-  }
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
