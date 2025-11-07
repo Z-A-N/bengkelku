@@ -90,12 +90,7 @@ class _SplashScreenState extends State<SplashScreen>
                           foreground: Paint()
                             ..style = PaintingStyle.stroke
                             ..strokeWidth = 3
-                            ..color = const Color.fromARGB(
-                              246,
-                              248,
-                              204,
-                              28,
-                            ), // outline kuning
+                            ..color = const Color.fromARGB(246, 248, 204, 28), // outline kuning
                         ),
                       ),
                       Text(
@@ -107,11 +102,15 @@ class _SplashScreenState extends State<SplashScreen>
                           letterSpacing: 1.2,
                           foreground: Paint()
                             ..shader = linearGradient([
-                              const Color(0xFFE43A58), // merah pekat terang
-                              const Color(0xFFD91B44), // merah utama solid
-                              const Color(0xFFA31232), // merah tua dalam
+                              const Color.fromARGB(
+                                255,
+                                247,
+                                75,
+                                106,
+                              ), // merah muda terang
+                              const Color(0xFFE21B4D), // merah figma
+                              const Color(0xFFC0103A), // merah tua bawah
                             ]),
-
                           shadows: const [
                             Shadow(
                               offset: Offset(1, 2),
