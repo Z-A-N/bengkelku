@@ -138,7 +138,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       height: 8,
                       decoration: BoxDecoration(
                         color: _currentPage == index
-                            ? const Color(0xFFE4A70A)
+                            ? const Color.fromARGB(255, 228, 10, 10)
                             : Colors.grey[300],
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -154,7 +154,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: ElevatedButton(
                       onPressed: _nextPage,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFB01D1D),
+                        backgroundColor: const Color(0xFFFFD320),
                         minimumSize: const Size(double.infinity, 50),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
@@ -162,7 +162,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                       child: const Text(
                         "Mulai Sekarang",
-                        style: TextStyle(fontSize: 16, color: Colors.white),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Color.fromARGB(255, 219, 12, 12),
+                        ),
                       ),
                     ),
                   ),
