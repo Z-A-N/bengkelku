@@ -127,9 +127,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         final item = onboardingData[index];
                         final isLastSlide = index == onboardingData.length - 1;
 
+                        // ✅ sudah diturunkan sedikit agar tampil lebih bawah
                         final double topPadding = height < 700
-                            ? (isLastSlide ? 65 : 90)
-                            : (isLastSlide ? 85 : 100);
+                            ? (isLastSlide ? 95 : 115)
+                            : (isLastSlide ? 115 : 135);
                         final double imageHeight = height < 700
                             ? (isLastSlide ? 170 : 145)
                             : (isLastSlide ? 200 : 170);
@@ -287,11 +288,10 @@ class _SunrisePainter extends CustomPainter {
     final Paint paint = Paint()
       ..shader = RadialGradient(
         colors: [
-          const Color(0xFFFFF59D), // kuning lembut
-          const Color(0xFFFFEE58), // kuning terang
-          const Color.fromARGB(60, 255, 214, 64), // kuning keemasan
-          // ignore: deprecated_member_use
-          Colors.white.withOpacity(0.0), // fade ke transparan
+          const Color(0xFFFFF59D),
+          const Color(0xFFFFEE58),
+          const Color.fromARGB(60, 255, 214, 64),
+          Colors.white.withOpacity(0.0),
         ],
         stops: const [0.0, 0.3, 0.6, 1.0],
         center: Alignment.bottomCenter,
