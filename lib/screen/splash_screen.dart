@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -32,6 +33,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
+    // navigasi ke onboarding
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -75,106 +77,102 @@ class _SplashScreenState extends State<SplashScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            // 🎞️ Logo animasi
             ScaleTransition(
               scale: _scaleAnimation,
               child: FadeTransition(
                 opacity: _fadeAnimation,
-                child: Image.asset('assets/logo.png', width: 120, height: 120),
+                child: Image.asset(
+                  'assets/logo.png',
+                  width: 120.w, // auto-scale
+                  height: 120.w,
+                ),
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 20.h),
+
+            // ✨ Teks BengkelKu dengan gradient dan outline
             FadeTransition(
               opacity: _fadeAnimation,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // ✨ BENGKEL (outline kuning, isi gradient merah glossy)
+                  // ✨ BENGKEL
                   Stack(
                     children: [
                       Text(
                         'Bengkel',
                         style: TextStyle(
-                          fontSize: 34,
+                          fontSize: 34.sp,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
                           foreground: Paint()
                             ..style = PaintingStyle.stroke
-                            ..strokeWidth = 3
-                            ..color = const Color.fromARGB(
-                              246,
-                              248,
-                              203,
-                              25,
-                            ), // outline kuning
+                            ..strokeWidth = 3.w
+                            ..color = const Color.fromARGB(246, 248, 203, 25),
                         ),
                       ),
                       Text(
                         'Bengkel',
                         style: TextStyle(
-                          fontSize: 34,
+                          fontSize: 34.sp,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
                           foreground: Paint()
                             ..shader = linearGradient([
-                              const Color.fromARGB(
-                                255,
-                                231,
-                                56,
-                                88,
-                              ), // merah muda terang
-                              const Color(0xFFE21B4D), // merah figma
-                              const Color(0xFFC0103A), // merah tua bawah
+                              const Color.fromARGB(255, 231, 56, 88),
+                              const Color(0xFFE21B4D),
+                              const Color(0xFFC0103A),
                             ]),
-                          shadows: const [
+                          shadows: [
                             Shadow(
-                              offset: Offset(1, 2),
-                              blurRadius: 3,
-                              color: Color(0x33000000),
+                              offset: Offset(1.w, 2.h),
+                              blurRadius: 3.w,
+                              color: const Color(0x33000000),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  // ✨ KU. (outline merah tua, isi gradient kuning glossy)
+
+                  // ✨ KU.
                   Stack(
                     children: [
                       Text(
                         'Ku.',
                         style: TextStyle(
-                          fontSize: 34,
+                          fontSize: 34.sp,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
                           foreground: Paint()
                             ..style = PaintingStyle.stroke
-                            ..strokeWidth = 3
-                            ..color = const Color(
-                              0xFFB01D1D,
-                            ), // outline merah tua
+                            ..strokeWidth = 3.w
+                            ..color = const Color(0xFFB01D1D),
                         ),
                       ),
                       Text(
                         'Ku.',
                         style: TextStyle(
-                          fontSize: 34,
+                          fontSize: 34.sp,
                           fontWeight: FontWeight.w900,
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
                           foreground: Paint()
                             ..shader = linearGradient([
-                              const Color(0xFFFFF799), // kuning pucat atas
-                              const Color(0xFFFFD320), // kuning utama
-                              const Color(0xFFF9B700), // kuning keemasan bawah
+                              const Color(0xFFFFF799),
+                              const Color(0xFFFFD320),
+                              const Color(0xFFF9B700),
                             ]),
-                          shadows: const [
+                          shadows: [
                             Shadow(
-                              offset: Offset(1, 2),
-                              blurRadius: 3,
-                              color: Color(0x33000000),
+                              offset: Offset(1.w, 2.h),
+                              blurRadius: 3.w,
+                              color: const Color(0x33000000),
                             ),
                           ],
                         ),

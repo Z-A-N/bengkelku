@@ -1,5 +1,9 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'auth/login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -13,7 +17,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     with SingleTickerProviderStateMixin {
   final PageController _controller = PageController();
   int _currentPage = 0;
+
   Timer? _autoSlideTimer;
+  bool _isAnimating = false;
+  bool _userDragging = false;
 
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
@@ -36,6 +43,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     },
   ];
 
+  static const _slideDuration = Duration(milliseconds: 600);
+  static const _slideCurve = Curves.easeInOut;
+
   @override
   void initState() {
     super.initState();
@@ -51,65 +61,81 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _startAutoSlide() {
+    _autoSlideTimer?.cancel();
     _autoSlideTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
-      if (!_controller.hasClients) return;
-
-      int nextPage = _currentPage + 1;
-
-      if (nextPage >= onboardingData.length) {
-        await _fadeController.forward();
-        await _controller.animateToPage(
-          0,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-        );
-        await _fadeController.reverse();
-        nextPage = 0;
-      } else {
-        _controller.animateToPage(
-          nextPage,
-          duration: const Duration(milliseconds: 600),
-          curve: Curves.easeInOut,
-        );
+      if (!_controller.hasClients || _isAnimating || _userDragging) return;
+      _isAnimating = true;
+      try {
+        int nextPage = _currentPage + 1;
+        if (nextPage >= onboardingData.length) {
+          await _fadeController.forward();
+          await _controller.animateToPage(
+            0,
+            duration: _slideDuration,
+            curve: _slideCurve,
+          );
+          await _fadeController.reverse();
+        } else {
+          await _controller.animateToPage(
+            nextPage,
+            duration: _slideDuration,
+            curve: _slideCurve,
+          );
+        }
+      } finally {
+        _isAnimating = false;
       }
     });
   }
 
+  void _stopAutoSlide() {
+    _autoSlideTimer?.cancel();
+    _autoSlideTimer = null;
+  }
+
   @override
   void dispose() {
-    _autoSlideTimer?.cancel();
+    _stopAutoSlide();
     _controller.dispose();
     _fadeController.dispose();
     super.dispose();
   }
 
   void _navigateToHome() {
+    _stopAutoSlide();
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const HomePage()),
+      MaterialPageRoute(builder: (_) => const Login()),
     );
   }
 
   Future<void> _goToLastSlideWithFade() async {
-    await _fadeController.forward();
-    await _controller.animateToPage(
-      onboardingData.length - 1,
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeInOutCubic,
-    );
-    await _fadeController.reverse();
+    if (_isAnimating) return;
+    _stopAutoSlide();
+    _isAnimating = true;
+    try {
+      await _fadeController.forward();
+      await _controller.animateToPage(
+        onboardingData.length - 1,
+        duration: const Duration(milliseconds: 800),
+        curve: Curves.easeInOutCubic,
+      );
+      await _fadeController.reverse();
+    } finally {
+      _isAnimating = false;
+      _startAutoSlide();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height;
+    final height = 1.sh; // total tinggi layar responsif
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Stack(
           children: [
-            // 🌅 Ornamen bawah (matahari terbit)
             const BottomHalfCircleOrnament(),
 
             FadeTransition(
@@ -117,117 +143,133 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               child: Column(
                 children: [
                   Expanded(
-                    child: PageView.builder(
-                      controller: _controller,
-                      onPageChanged: (index) {
-                        if (mounted) setState(() => _currentPage = index);
+                    child: NotificationListener<UserScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification.direction != ScrollDirection.idle &&
+                            !_userDragging) {
+                          _userDragging = true;
+                          _stopAutoSlide();
+                        }
+                        if (notification.direction == ScrollDirection.idle &&
+                            _userDragging) {
+                          _userDragging = false;
+                          _startAutoSlide();
+                        }
+                        return false;
                       },
-                      itemCount: onboardingData.length,
-                      itemBuilder: (context, index) {
-                        final item = onboardingData[index];
-                        final isLastSlide = index == onboardingData.length - 1;
+                      child: PageView.builder(
+                        controller: _controller,
+                        onPageChanged: (index) {
+                          if (mounted) setState(() => _currentPage = index);
+                        },
+                        itemCount: onboardingData.length,
+                        itemBuilder: (context, index) {
+                          final item = onboardingData[index];
+                          final isLastSlide =
+                              index == onboardingData.length - 1;
 
-                        // ✅ sudah diturunkan sedikit agar tampil lebih bawah
-                        final double topPadding = height < 700
-                            ? (isLastSlide ? 95 : 115)
-                            : (isLastSlide ? 115 : 135);
-                        final double imageHeight = height < 700
-                            ? (isLastSlide ? 170 : 145)
-                            : (isLastSlide ? 200 : 170);
+                          final double topPadding = height < 700.h
+                              ? (isLastSlide ? 95.h : 115.h)
+                              : (isLastSlide ? 115.h : 135.h);
+                          final double imageHeight = height < 700.h
+                              ? (isLastSlide ? 170.h : 145.h)
+                              : (isLastSlide ? 200.h : 170.h);
 
-                        return Padding(
-                          padding: EdgeInsets.only(top: topPadding),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.start,
-                            children: [
-                              Image.asset(
-                                item["image"]!,
-                                height: imageHeight,
-                                fit: BoxFit.contain,
-                              ),
-                              const SizedBox(height: 35),
-                              Text(
-                                item["title"]!,
-                                style: const TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFB01D1D),
+                          return Padding(
+                            padding: EdgeInsets.only(top: topPadding),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              children: [
+                                Image.asset(
+                                  item["image"]!,
+                                  height: imageHeight,
+                                  fit: BoxFit.contain,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 12),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 30,
-                                ),
-                                child: Text(
-                                  item["desc"]!,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.black54,
+                                SizedBox(height: 35.h),
+                                Text(
+                                  item["title"]!,
+                                  style: TextStyle(
+                                    fontSize: 22.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: const Color(0xFFB01D1D),
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
+                                SizedBox(height: 12.h),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 30.w,
+                                  ),
+                                  child: Text(
+                                    item["desc"]!,
+                                    style: TextStyle(
+                                      fontSize: 15.sp,
+                                      color: Colors.black54,
+                                      height: 1.4,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
 
                   // 🔘 Dots indikator
                   if (_currentPage != onboardingData.length - 1)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 15),
+                      padding: EdgeInsets.only(bottom: 15.h),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: List.generate(
                           onboardingData.length,
                           (index) => AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: _currentPage == index ? 14 : 8,
-                            height: 8,
+                            margin: EdgeInsets.symmetric(horizontal: 4.w),
+                            width: _currentPage == index ? 14.w : 8.w,
+                            height: 8.h,
                             decoration: BoxDecoration(
                               color: _currentPage == index
                                   ? const Color(0xFFE40A0A)
                                   : Colors.grey[300],
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(10.r),
                             ),
                           ),
                         ),
                       ),
                     ),
 
-                  const SizedBox(height: 25),
+                  SizedBox(height: 25.h),
 
-                  // 🔸 Tombol CTA (halaman terakhir)
+                  // 🔸 Tombol CTA
                   if (_currentPage == onboardingData.length - 1)
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(80, 0, 80, 45),
+                      padding: EdgeInsets.fromLTRB(80.w, 0, 80.w, 45.h),
                       child: ElevatedButton(
                         onPressed: _navigateToHome,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFDB0C0C),
-                          minimumSize: const Size(double.infinity, 50),
+                          minimumSize: Size(double.infinity, 50.h),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(12.r),
                           ),
                           elevation: 4,
                         ),
-                        child: const Text(
+                        child: Text(
                           "Mulai Sekarang",
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 16.sp,
                             fontWeight: FontWeight.w600,
-                            color: Color.fromARGB(255, 255, 255, 255),
+                            color: Colors.white,
                           ),
                         ),
                       ),
                     ),
 
-                  const SizedBox(height: 15),
+                  SizedBox(height: 15.h),
                 ],
               ),
             ),
@@ -235,15 +277,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             // 🔹 Tombol Lewati
             if (_currentPage != onboardingData.length - 1)
               Positioned(
-                right: 20,
-                top: 10,
+                right: 20.w,
+                top: 10.h,
                 child: TextButton(
                   onPressed: _goToLastSlideWithFade,
-                  child: const Text(
+                  child: Text(
                     "Lewati",
                     style: TextStyle(
                       color: Colors.black54,
-                      fontSize: 16,
+                      fontSize: 16.sp,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -256,7 +298,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 }
 
-// 🌅 Ornamen bawah seperti matahari terbit (gradasi kuning)
+// 🌅 Ornamen bawah (gradasi kuning)
 class BottomHalfCircleOrnament extends StatelessWidget {
   const BottomHalfCircleOrnament({super.key});
 
@@ -291,7 +333,6 @@ class _SunrisePainter extends CustomPainter {
           const Color(0xFFFFF59D),
           const Color(0xFFFFEE58),
           const Color.fromARGB(60, 255, 214, 64),
-          // ignore: deprecated_member_use
           Colors.white.withOpacity(0.0),
         ],
         stops: const [0.0, 0.3, 0.6, 1.0],
