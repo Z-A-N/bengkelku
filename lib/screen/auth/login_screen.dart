@@ -1,44 +1,51 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
+import 'forgot_password_screen.dart';
+import 'register_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-class Login extends StatefulWidget {
-  const Login({super.key});
+class Masuk extends StatefulWidget {
+  const Masuk({super.key});
 
   @override
-  State<Login> createState() => _LoginState();
+  State<Masuk> createState() => _MasukState();
 }
 
-class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
-  bool _obscureText = true;
-  late AnimationController _controller;
-  late Animation<double> _fadeAnimation;
-  late Animation<Offset> _slideAnimation;
+class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
+  bool _sembunyikanPassword = true;
+  late AnimationController _pengendaliAnimasi;
+  late Animation<double> _animasiFade;
+  late Animation<Offset> _animasiGeser;
 
   @override
   void initState() {
     super.initState();
 
-    _controller = AnimationController(
+    _pengendaliAnimasi = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
 
-    _fadeAnimation = CurvedAnimation(
-      parent: _controller,
+    _animasiFade = CurvedAnimation(
+      parent: _pengendaliAnimasi,
       curve: Curves.easeInOut,
     );
 
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.2),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _animasiGeser = Tween<Offset>(begin: const Offset(0, 0.2), end: Offset.zero)
+        .animate(
+          CurvedAnimation(
+            parent: _pengendaliAnimasi,
+            curve: Curves.easeOutCubic,
+          ),
+        );
 
-    _controller.forward();
+    _pengendaliAnimasi.forward();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _pengendaliAnimasi.dispose();
     super.dispose();
   }
 
@@ -49,7 +56,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
       body: SafeArea(
         child: Stack(
           children: [
-            const TopHalfCircleOrnament(),
+            const OrnamenSetengahLingkaranAtas(),
 
             // 🧱 Konten utama
             Center(
@@ -63,14 +70,13 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      SizedBox(
-                        height: 0.05.sh,
-                      ), // ✅ posisi logo disesuaikan (5% tinggi layar)
+                      SizedBox(height: 0.05.sh),
+
                       // 🌅 Logo
                       FadeTransition(
-                        opacity: _fadeAnimation,
+                        opacity: _animasiFade,
                         child: SlideTransition(
-                          position: _slideAnimation,
+                          position: _animasiGeser,
                           child: Center(
                             child: Image.asset(
                               'assets/logo.png',
@@ -86,14 +92,14 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
 
                       // 📝 Judul
                       FadeTransition(
-                        opacity: _fadeAnimation,
+                        opacity: _animasiFade,
                         child: Align(
                           alignment: Alignment.centerLeft,
                           child: Text.rich(
                             TextSpan(
                               children: [
                                 TextSpan(
-                                  text: "Sign in to your\n",
+                                  text: "Masuk ke akun\n",
                                   style: TextStyle(
                                     fontSize: 26.sp,
                                     fontWeight: FontWeight.w800,
@@ -101,7 +107,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                                   ),
                                 ),
                                 TextSpan(
-                                  text: "Account",
+                                  text: "Anda",
                                   style: TextStyle(
                                     fontSize: 26.sp,
                                     fontWeight: FontWeight.w800,
@@ -119,7 +125,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          "Enter your email and password to log in",
+                          "Masukkan email dan kata sandi untuk masuk",
                           style: TextStyle(
                             color: Colors.black54,
                             fontSize: 15.sp,
@@ -135,7 +141,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
                           labelText: "Email",
-                          hintText: "example@gmail.com",
+                          hintText: "contoh@gmail.com",
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12.r),
                           ),
@@ -147,28 +153,30 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
 
                       // 🔒 Password
                       TextField(
-                        obscureText: _obscureText,
+                        obscureText: _sembunyikanPassword,
                         decoration: InputDecoration(
-                          labelText: "Password",
+                          labelText: "Kata Sandi",
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12.r),
                           ),
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _obscureText
+                              _sembunyikanPassword
                                   ? Icons.visibility_off
                                   : Icons.visibility,
                             ),
-                            onPressed: () =>
-                                setState(() => _obscureText = !_obscureText),
+                            onPressed: () => setState(
+                              () =>
+                                  _sembunyikanPassword = !_sembunyikanPassword,
+                            ),
                           ),
                         ),
                       ),
 
                       SizedBox(height: 10.h),
 
-                      // 🔘 Remember me & Forgot Password
+                      // 🔘 Ingat saya & Lupa kata sandi
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -180,15 +188,22 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                                 activeColor: const Color(0xFFDB0C0C),
                               ),
                               Text(
-                                "Remember me",
+                                "Ingat saya",
                                 style: TextStyle(fontSize: 14.sp),
                               ),
                             ],
                           ),
                           TextButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LupaKataSandi(),
+                                ),
+                              );
+                            },
                             child: Text(
-                              "Forgot Password?",
+                              "Lupa kata sandi?",
                               style: TextStyle(
                                 color: const Color(0xFFDB0C0C),
                                 fontWeight: FontWeight.w500,
@@ -201,7 +216,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
 
                       SizedBox(height: 15.h),
 
-                      // 🔴 Tombol Login
+                      // 🔴 Tombol Masuk
                       SizedBox(
                         width: double.infinity,
                         height: 48.h,
@@ -214,7 +229,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                             ),
                           ),
                           child: Text(
-                            "Log In",
+                            "Masuk",
                             style: TextStyle(
                               fontSize: 16.sp,
                               fontWeight: FontWeight.w600,
@@ -226,7 +241,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
 
                       SizedBox(height: 20.h),
 
-                      // OR Divider
+                      // Garis pembatas “Atau”
                       Row(
                         children: [
                           Expanded(
@@ -238,7 +253,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
                           Padding(
                             padding: EdgeInsets.symmetric(horizontal: 8.w),
                             child: Text(
-                              "Or",
+                              "Atau",
                               style: TextStyle(fontSize: 14.sp),
                             ),
                           ),
@@ -253,31 +268,38 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
 
                       SizedBox(height: 20.h),
 
-                      // 🟢 Google Button
-                      _socialButton(
-                        'Continue with Google',
+                      // 🟢 Tombol Google
+                      _tombolSosial(
+                        'Lanjut dengan Google',
                         'assets/google.png',
                       ),
 
                       SizedBox(height: 15.h),
 
-                      // 🔵 Facebook Button
-                      _socialButton('Continue with Facebook', 'assets/fb.png'),
+                      // 🔵 Tombol Facebook
+                      _tombolSosial('Lanjut dengan Facebook', 'assets/fb.png'),
 
                       SizedBox(height: 25.h),
 
-                      // 🔻 Sign Up
+                      // 🔻 Daftar akun
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            "Don’t have an account? ",
+                            "Belum punya akun? ",
                             style: TextStyle(fontSize: 14.sp),
                           ),
                           GestureDetector(
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const Daftar(),
+                                ),
+                              );
+                            },
                             child: Text(
-                              "Sign Up",
+                              "Daftar",
                               style: TextStyle(
                                 color: const Color(0xFFDB0C0C),
                                 fontWeight: FontWeight.bold,
@@ -298,12 +320,13 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
     );
   }
 
-  Widget _socialButton(String label, String iconPath) {
+  // 🧩 Komponen tombol sosial media
+  Widget _tombolSosial(String teks, String pathIkon) {
     return SizedBox(
       width: double.infinity,
       height: 48.h,
       child: OutlinedButton.icon(
-        icon: Image.asset(iconPath, width: 22.w),
+        icon: Image.asset(pathIkon, width: 22.w),
         onPressed: () {},
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(
@@ -311,7 +334,7 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
           ),
         ),
         label: Text(
-          label,
+          teks,
           style: TextStyle(fontSize: 15.sp, color: Colors.black87),
         ),
       ),
@@ -320,10 +343,10 @@ class _LoginState extends State<Login> with SingleTickerProviderStateMixin {
 }
 
 //
-// ☀️ Ornamen setengah lingkaran
+// ☀️ Ornamen setengah lingkaran atas
 //
-class TopHalfCircleOrnament extends StatelessWidget {
-  const TopHalfCircleOrnament({super.key});
+class OrnamenSetengahLingkaranAtas extends StatelessWidget {
+  const OrnamenSetengahLingkaranAtas({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -333,22 +356,22 @@ class TopHalfCircleOrnament extends StatelessWidget {
       child: SizedBox(
         width: double.infinity,
         height: 0.3.sh,
-        child: CustomPaint(painter: _SunrisePainter(diameter)),
+        child: CustomPaint(painter: _LukisMatahariTerbit(diameter)),
       ),
     );
   }
 }
 
-class _SunrisePainter extends CustomPainter {
+class _LukisMatahariTerbit extends CustomPainter {
   final double diameter;
-  _SunrisePainter(this.diameter);
+  _LukisMatahariTerbit(this.diameter);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final Offset center = Offset(size.width / 2, 0);
-    final Rect rect = Rect.fromCircle(center: center, radius: diameter / 2);
+    final Offset tengah = Offset(size.width / 2, 0);
+    final Rect area = Rect.fromCircle(center: tengah, radius: diameter / 2);
 
-    final Paint paint = Paint()
+    final Paint kuas = Paint()
       ..shader = RadialGradient(
         colors: [
           const Color(0xFFFFF59D),
@@ -359,9 +382,9 @@ class _SunrisePainter extends CustomPainter {
         stops: const [0.0, 0.3, 0.6, 1.0],
         center: Alignment.topCenter,
         radius: 1.0,
-      ).createShader(rect);
+      ).createShader(area);
 
-    canvas.drawCircle(center, diameter / 2, paint);
+    canvas.drawCircle(tengah, diameter / 2, kuas);
   }
 
   @override

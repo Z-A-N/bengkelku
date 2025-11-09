@@ -105,7 +105,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _stopAutoSlide();
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const Login()),
+      MaterialPageRoute(builder: (_) => const Masuk()),
     );
   }
 
