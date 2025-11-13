@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LupaKataSandi extends StatefulWidget {
   const LupaKataSandi({super.key});
@@ -17,6 +18,7 @@ class _LupaKataSandiState extends State<LupaKataSandi>
   late Animation<Offset> _animasiGeser;
 
   final TextEditingController _emailController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -50,18 +52,87 @@ class _LupaKataSandiState extends State<LupaKataSandi>
     super.dispose();
   }
 
-  void _kirimLinkReset() {
+  /// Fungsi kirim link reset ke email Firebase
+  Future<void> _kirimLinkReset() async {
     final email = _emailController.text.trim();
+
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Harap masukkan alamat email kamu")),
+      _tampilkanDialog(
+        judul: "Email Kosong",
+        pesan: "Harap masukkan alamat email kamu terlebih dahulu.",
+        ikon: Icons.warning_amber_rounded,
+        warna: Colors.orange,
       );
       return;
     }
 
-    // TODO: Tambahkan logika backend (Firebase / API)
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Link reset kata sandi telah dikirim ke $email")),
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      _tampilkanDialog(
+        judul: "Berhasil!",
+        pesan:
+            "Tautan reset kata sandi telah dikirim ke:\n$email\n\nCek kotak masuk atau folder spam kamu.",
+        ikon: Icons.email_outlined,
+        warna: Colors.green,
+      );
+    } on FirebaseAuthException catch (e) {
+      String pesan = "Terjadi kesalahan. Coba lagi nanti.";
+      IconData ikon = Icons.error_outline;
+      Color warna = Colors.redAccent;
+
+      switch (e.code) {
+        case "invalid-email":
+          pesan = "Format email tidak valid. Pastikan alamat email benar.";
+          break;
+        case "user-not-found":
+          pesan =
+              "Email ini tidak terdaftar. Silakan periksa kembali atau daftar akun baru.";
+          break;
+        case "network-request-failed":
+          pesan = "Koneksi internet bermasalah. Coba lagi.";
+          break;
+      }
+
+      _tampilkanDialog(judul: "Gagal", pesan: pesan, ikon: ikon, warna: warna);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _tampilkanDialog({
+    required String judul,
+    required String pesan,
+    required IconData ikon,
+    required Color warna,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(ikon, color: warna, size: 26),
+            const SizedBox(width: 10),
+            Text(
+              judul,
+              style: TextStyle(
+                color: warna,
+                fontWeight: FontWeight.bold,
+                fontSize: 18.sp,
+              ),
+            ),
+          ],
+        ),
+        content: Text(pesan, style: TextStyle(fontSize: 14.sp, height: 1.4)),
+        actions: [
+          TextButton(
+            child: const Text("OK"),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
     );
   }
 
@@ -91,13 +162,11 @@ class _LupaKataSandiState extends State<LupaKataSandi>
                         opacity: _animasiFade,
                         child: SlideTransition(
                           position: _animasiGeser,
-                          child: Center(
-                            child: Image.asset(
-                              'assets/logo.png',
-                              width: 100.w,
-                              height: 100.w,
-                              fit: BoxFit.contain,
-                            ),
+                          child: Image.asset(
+                            'assets/logo.png',
+                            width: 100.w,
+                            height: 100.w,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ),
@@ -136,7 +205,6 @@ class _LupaKataSandiState extends State<LupaKataSandi>
 
                       SizedBox(height: 10.h),
 
-                      // 🗒 Deskripsi dengan efek mengetik tanpa kursor
                       const DeskripsiAnimasi(),
 
                       SizedBox(height: 30.h),
@@ -172,7 +240,7 @@ class _LupaKataSandiState extends State<LupaKataSandi>
                             width: double.infinity,
                             height: 48.h,
                             child: ElevatedButton(
-                              onPressed: _kirimLinkReset,
+                              onPressed: _isLoading ? null : _kirimLinkReset,
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFDB0C0C),
                                 shape: RoundedRectangleBorder(
@@ -180,14 +248,19 @@ class _LupaKataSandiState extends State<LupaKataSandi>
                                 ),
                                 elevation: 2,
                               ),
-                              child: Text(
-                                "Kirim Tautan Reset",
-                                style: TextStyle(
-                                  fontSize: 16.sp,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
+                              child: _isLoading
+                                  ? const CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    )
+                                  : Text(
+                                      "Kirim Tautan Reset",
+                                      style: TextStyle(
+                                        fontSize: 16.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -195,7 +268,7 @@ class _LupaKataSandiState extends State<LupaKataSandi>
 
                       SizedBox(height: 25.h),
 
-                      // 🔙 Kembali ke Halaman Login
+                      // 🔙 Kembali ke Login
                       FadeTransition(
                         opacity: _animasiFade,
                         child: Row(
@@ -209,9 +282,7 @@ class _LupaKataSandiState extends State<LupaKataSandi>
                               ),
                             ),
                             GestureDetector(
-                              onTap: () {
-                                Navigator.pop(context);
-                              },
+                              onTap: () => Navigator.pop(context),
                               child: Text(
                                 "Masuk Sekarang",
                                 style: TextStyle(
@@ -224,8 +295,6 @@ class _LupaKataSandiState extends State<LupaKataSandi>
                           ],
                         ),
                       ),
-
-                      SizedBox(height: 0.1.sh),
                     ],
                   ),
                 ),
@@ -266,20 +335,18 @@ class _LukisMatahariTerbit extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Offset tengah = Offset(size.width / 2, 0);
     final Rect area = Rect.fromCircle(center: tengah, radius: diameter / 2);
-
     final Paint kuas = Paint()
-      ..shader = RadialGradient(
+      ..shader = const RadialGradient(
         colors: [
-          const Color(0xFFFFF59D),
-          const Color(0xFFFFEE58),
-          const Color.fromARGB(60, 255, 214, 64),
-          Colors.white.withOpacity(0.0),
+          Color(0xFFFFF59D),
+          Color(0xFFFFEE58),
+          Color.fromARGB(60, 255, 214, 64),
+          Colors.transparent,
         ],
-        stops: const [0.0, 0.3, 0.6, 1.0],
+        stops: [0.0, 0.3, 0.6, 1.0],
         center: Alignment.topCenter,
         radius: 1.0,
       ).createShader(area);
-
     canvas.drawCircle(tengah, diameter / 2, kuas);
   }
 
@@ -288,7 +355,7 @@ class _LukisMatahariTerbit extends CustomPainter {
 }
 
 //
-// 💬 Deskripsi Animasi dengan Efek Mengetik (tanpa kursor)
+// 💬 Deskripsi Animasi (efek mengetik)
 //
 class DeskripsiAnimasi extends StatefulWidget {
   const DeskripsiAnimasi({super.key});
@@ -308,7 +375,6 @@ class _DeskripsiAnimasiState extends State<DeskripsiAnimasi> {
   void initState() {
     super.initState();
 
-    // Delay sebelum animasi mulai
     Future.delayed(const Duration(milliseconds: 300), () {
       if (!mounted) return;
       setState(() {
@@ -319,7 +385,6 @@ class _DeskripsiAnimasiState extends State<DeskripsiAnimasi> {
     });
   }
 
-  // Efek mengetik huruf per huruf
   void _typeWriterEffect() async {
     for (int i = 0; i < _text.length; i++) {
       await Future.delayed(const Duration(milliseconds: 25));

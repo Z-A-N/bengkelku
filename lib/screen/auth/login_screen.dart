@@ -271,13 +271,13 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                       // 🟢 Tombol Google
                       _tombolSosial(
                         'Lanjut dengan Google',
-                        'assets/google.png',
+                        'assets/google.webp',
                       ),
 
                       SizedBox(height: 15.h),
 
                       // 🔵 Tombol Facebook
-                      _tombolSosial('Lanjut dengan Facebook', 'assets/fb.png'),
+                      _tombolSosial('Lanjut dengan Facebook', 'assets/fb.webp'),
 
                       SizedBox(height: 25.h),
 
