@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'login_screen.dart'; // ⬅ penting untuk redirect setelah daftar
 
 class Daftar extends StatefulWidget {
   const Daftar({super.key});
@@ -50,9 +51,7 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
 
     _passwordFocusNode = FocusNode()
       ..addListener(() {
-        if (mounted) {
-          setState(() {});
-        }
+        if (mounted) setState(() {});
       });
 
     _animController = AnimationController(
@@ -99,8 +98,9 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
   }
 
   // -------------------------------------------
-  //              LOGIC FITUR
+  // LOGIC VALIDASI
   // -------------------------------------------
+
   bool _isValidEmail(String email) {
     return RegExp(r'^[^@]+@[^@]+\.[^@]+$').hasMatch(email);
   }
@@ -138,9 +138,9 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
     });
   }
 
-  // -----------------------
-  // Registration handler
-  // -----------------------
+  // -------------------------------------------
+  // REGISTER HANDLER
+  // -------------------------------------------
   Future<void> _daftarUser() async {
     if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
@@ -161,6 +161,7 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
       );
 
       final user = FirebaseAuth.instance.currentUser ?? cred.user;
+
       if (user != null) {
         await user.updateDisplayName(nama);
       }
@@ -169,10 +170,17 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Akun berhasil dibuat! Silakan login.')),
         );
-        Navigator.pop(context);
+
+        // ⬅ PERUBAHAN TERPENTING: langsung ke login
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const Masuk()),
+          (route) => false,
+        );
       }
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
+
       setState(() {
         switch (e.code) {
           case 'email-already-in-use':
@@ -194,19 +202,19 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
         }
       });
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   // -------------------------------------------
-  // Strength Bar kecil (supaya tidak rebuild satu form)
+  // WIDGET STRENGTH BAR
   // -------------------------------------------
+
   Widget _strengthBar() {
-    final double value = _strengthValue;
-    final Color color = _strengthColor;
-    final String label = _strengthLabel;
+    final value = _strengthValue;
+    final color = _strengthColor;
+    final label = _strengthLabel;
+
     final bool show =
         _passwordFocusNode.hasFocus && _passwordController.text.isNotEmpty;
 
@@ -274,6 +282,7 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
           child: Stack(
             children: [
               const OrnamenSetengahLingkaranAtas(),
+
               Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: 500.w),
@@ -384,11 +393,9 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
                               }
                               return null;
                             },
-                            onChanged: _updatePasswordStrength,
                           ),
 
                           _strengthBar(),
-
                           SizedBox(height: 16.h),
 
                           TextFormField(
@@ -487,7 +494,7 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
 }
 
 // -------------------------------------------
-// SEGMENT WIDGET (ringan & optimal)
+// SEGMENT WIDGET
 // -------------------------------------------
 
 class _Segment extends StatelessWidget {
@@ -523,7 +530,7 @@ class _Segment extends StatelessWidget {
 }
 
 // -------------------------------------------
-// ORNAMEN PENTING (tetap, tapi optimal)
+// ORNAMEN
 // -------------------------------------------
 
 class OrnamenSetengahLingkaranAtas extends StatelessWidget {
