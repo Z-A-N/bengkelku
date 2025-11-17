@@ -1,26 +1,68 @@
-// Improved UI/UX version of vehicle_form_screen.dart
-// Theme tetap sama, namun lebih modern, bersih, dan presisi.
-// Catatan: Sesuaikan import & struktur folder sesuai project Anda.
-
 // ignore_for_file: use_build_context_synchronously, deprecated_member_use, curly_braces_in_flow_control_structures
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+// ---------------------------------------------------------
+// Uppercase formatter untuk plat nomor
+// ---------------------------------------------------------
 class UpperCaseTextFormatter extends TextInputFormatter {
   const UpperCaseTextFormatter();
   @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
+  TextEditingValue formatEditUpdate(_, newValue) {
     return newValue.copyWith(text: newValue.text.toUpperCase());
   }
 }
 
+// ---------------------------------------------------------
+// Slim Dropdown — Floating Label Version
+// ---------------------------------------------------------
+class SlimDropdown extends StatelessWidget {
+  final String label;
+  final String? value;
+  final List<String> items;
+  final IconData? icon; // boleh null (tanpa ikon)
+  final Function(String?) onChanged;
+  final String? Function(String?)? validator;
+
+  const SlimDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.icon,
+    this.validator,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField(
+      value: value,
+      validator: validator,
+      decoration: InputDecoration(
+        labelText: label, // ← FLOATING LABEL
+        prefixIcon: icon == null ? null : Icon(icon),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: const BorderSide(color: Color(0xFFDB0C0C), width: 1.4),
+        ),
+      ),
+      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+      items: items
+          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+          .toList(),
+      onChanged: onChanged,
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// MAIN SCREEN
+// ---------------------------------------------------------
 class VehicleFormScreen extends StatefulWidget {
   const VehicleFormScreen({super.key});
   @override
@@ -36,8 +78,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
   String? model;
   String? tahun;
 
-  final TextEditingController nomorPolisi = TextEditingController();
-  final TextEditingController kilometer = TextEditingController();
+  final nomorPolisi = TextEditingController();
+  final kilometer = TextEditingController();
 
   bool loading = false;
 
@@ -45,30 +87,40 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
   late Animation<double> fade;
   late Animation<Offset> slide;
 
-  final Map<String, List<String>> modelMotor = {
+  final modelMotor = {
     "Honda": ["Beat", "Vario 125", "PCX", "Scoopy"],
     "Yamaha": ["NMax", "Aerox", "Fino", "Mio"],
     "Suzuki": ["Nex II", "Address", "Satria F150"],
   };
 
-  final Map<String, List<String>> modelMobil = {
+  final modelMobil = {
     "Toyota": ["Avanza", "Rush", "Agya", "Yaris"],
     "Daihatsu": ["Xenia", "Ayla", "Terios", "Sigra"],
     "Honda": ["Brio", "HR-V", "Jazz", "Civic"],
   };
 
+  // Ikon dinamis hanya untuk jenis kendaraan
+  IconData getVehicleIcon() {
+    return jenisKendaraan == "Motor"
+        ? Icons.motorcycle_rounded
+        : Icons.directions_car_rounded;
+  }
+
   @override
   void initState() {
     super.initState();
+
     anim = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 600),
     );
+
     fade = CurvedAnimation(parent: anim, curve: Curves.easeInOut);
     slide = Tween<Offset>(
-      begin: const Offset(0, 0.15),
+      begin: const Offset(0, 0.2),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
+
     anim.forward();
   }
 
@@ -80,8 +132,10 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
     super.dispose();
   }
 
+  // Save Vehicle
   Future<void> simpanData() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+
     setState(() => loading = true);
 
     final uid = FirebaseAuth.instance.currentUser!.uid;
@@ -110,31 +164,28 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
     Navigator.pop(context);
   }
 
-  InputDecoration _dekor(String label, IconData icon) {
+  // TextField floating label
+  InputDecoration _input(String label, {IconData? icon}) {
     return InputDecoration(
-      labelText: label,
-      filled: true,
-      fillColor: Colors.white,
-      labelStyle: TextStyle(fontWeight: FontWeight.w400, fontSize: 14.sp),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14.r),
-        borderSide: const BorderSide(color: Color(0xFFDDDDDD), width: 1),
+      labelText: label, // ← FLOATING LABEL
+      prefixIcon: icon == null ? null : Icon(icon),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        borderSide: const BorderSide(color: Color(0xFFDB0C0C), width: 1.4),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14.r),
-        borderSide: const BorderSide(color: Color(0xFFE6E6E6), width: 1),
-      ),
-      prefixIcon: Icon(icon, size: 22.sp, color: Colors.grey[800]),
-      contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
     );
   }
 
+  // ---------------------------------------------------------
+  // UI
+  // ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.grey[50],
+        backgroundColor: Colors.white,
         body: SafeArea(
           child: Stack(
             children: [
@@ -155,215 +206,160 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            SizedBox(height: 0.04.sh),
+                            SizedBox(height: 0.05.sh),
 
                             Text(
                               "Isi Data\nKendaraan Anda",
                               style: TextStyle(
-                                fontSize: 30.sp,
-                                fontWeight: FontWeight.w500,
-                                height: 1.1,
-                                color: Colors.black87,
+                                fontSize: 28.sp,
+                                fontWeight: FontWeight.w800,
                               ),
                             ),
+                            SizedBox(height: 24.h),
 
-                            SizedBox(height: 28.h),
-
-                            Container(
-                              padding: EdgeInsets.all(20.w),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(18.r),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.05),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
+                            Form(
+                              key: _formKey,
+                              child: Column(
+                                children: [
+                                  // Jenis Kendaraan — floating label + icon dinamis
+                                  SlimDropdown(
+                                    label: "Jenis Kendaraan",
+                                    value: jenisKendaraan,
+                                    items: const ["Motor", "Mobil"],
+                                    icon: getVehicleIcon(),
+                                    onChanged: (v) {
+                                      setState(() {
+                                        jenisKendaraan = v!;
+                                        merek = null;
+                                        model = null;
+                                      });
+                                    },
                                   ),
-                                ],
-                              ),
-                              child: Form(
-                                key: _formKey,
-                                child: Column(
-                                  children: [
-                                    DropdownButtonFormField(
-                                      value: jenisKendaraan,
-                                      decoration: _dekor(
-                                        "Jenis Kendaraan",
-                                        Icons.directions_bus_filled,
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: "Motor",
-                                          child: Text("Motor"),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: "Mobil",
-                                          child: Text("Mobil"),
-                                        ),
-                                      ],
-                                      onChanged: (v) {
-                                        setState(() {
-                                          jenisKendaraan = v!;
-                                          merek = null;
-                                          model = null;
-                                        });
-                                      },
-                                    ),
+                                  SizedBox(height: 20.h),
 
-                                    SizedBox(height: 18.h),
+                                  // Nomor Polisi — floating label
+                                  TextFormField(
+                                    controller: nomorPolisi,
+                                    inputFormatters: const [
+                                      UpperCaseTextFormatter(),
+                                    ],
+                                    decoration: _input("Nomor Polisi"),
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) {
+                                        return "Wajib diisi";
+                                      }
+                                      final reg = RegExp(
+                                        r'^[A-Z]{1,2}\s?[0-9]{1,4}\s?[A-Z]{1,3}$',
+                                      );
+                                      if (!reg.hasMatch(v)) {
+                                        return "Format tidak valid";
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  SizedBox(height: 20.h),
 
-                                    TextFormField(
-                                      controller: nomorPolisi,
-                                      inputFormatters: const [
-                                        UpperCaseTextFormatter(),
-                                      ],
-                                      decoration: _dekor(
-                                        "Nomor Polisi",
-                                        Icons.numbers,
-                                      ),
-                                      validator: (v) {
-                                        if (v == null || v.isEmpty)
-                                          return "Wajib diisi";
-                                        final reg = RegExp(
-                                          r'^[A-Z]{1,2}\s?[0-9]{1,4}\s?[A-Z]{1,3}\$',
-                                        );
-                                        if (!reg.hasMatch(v))
-                                          return "Format plat tidak valid";
-                                        return null;
-                                      },
-                                    ),
-
-                                    SizedBox(height: 18.h),
-
-                                    DropdownButtonFormField<String>(
-                                      value: merek,
-                                      decoration: _dekor(
-                                        "Merek",
-                                        Icons.branding_watermark,
-                                      ),
-                                      items:
-                                          (jenisKendaraan == "Motor"
-                                                  ? modelMotor.keys
-                                                  : modelMobil.keys)
-                                              .map(
-                                                (m) => DropdownMenuItem(
-                                                  value: m,
-                                                  child: Text(m),
-                                                ),
-                                              )
-                                              .toList(),
-                                      onChanged: (v) => setState(() {
+                                  // Merek — floating label
+                                  SlimDropdown(
+                                    label: "Merek",
+                                    value: merek,
+                                    items:
+                                        (jenisKendaraan == "Motor"
+                                                ? modelMotor.keys
+                                                : modelMobil.keys)
+                                            .toList(),
+                                    icon: null,
+                                    onChanged: (v) {
+                                      setState(() {
                                         merek = v;
                                         model = null;
-                                      }),
-                                      validator: (v) =>
-                                          v == null ? "Pilih merek" : null,
+                                      });
+                                    },
+                                    validator: (v) =>
+                                        v == null ? "Pilih merek" : null,
+                                  ),
+                                  SizedBox(height: 20.h),
+
+                                  // Model — floating label
+                                  SlimDropdown(
+                                    label: "Model",
+                                    value: model,
+                                    items: merek == null
+                                        ? []
+                                        : (jenisKendaraan == "Motor"
+                                              ? modelMotor[merek]!
+                                              : modelMobil[merek]!),
+                                    icon: null,
+                                    onChanged: (v) => setState(() => model = v),
+                                    validator: (v) =>
+                                        v == null ? "Pilih model" : null,
+                                  ),
+                                  SizedBox(height: 20.h),
+
+                                  // Tahun — floating label
+                                  SlimDropdown(
+                                    label: "Tahun",
+                                    value: tahun,
+                                    items: List.generate(
+                                      16,
+                                      (i) => (2010 + i).toString(),
                                     ),
+                                    icon: null,
+                                    onChanged: (v) => setState(() => tahun = v),
+                                    validator: (v) =>
+                                        v == null ? "Pilih tahun" : null,
+                                  ),
+                                  SizedBox(height: 20.h),
 
-                                    SizedBox(height: 18.h),
-
-                                    DropdownButtonFormField<String>(
-                                      value: model,
-                                      decoration: _dekor(
-                                        "Model",
-                                        Icons.fire_truck_sharp,
-                                      ),
-                                      items: merek == null
-                                          ? []
-                                          : (jenisKendaraan == "Motor"
-                                                    ? modelMotor[merek]!
-                                                    : modelMobil[merek]!)
-                                                .map(
-                                                  (m) => DropdownMenuItem(
-                                                    value: m,
-                                                    child: Text(m),
-                                                  ),
-                                                )
-                                                .toList(),
-                                      onChanged: (v) =>
-                                          setState(() => model = v),
-                                      validator: (v) =>
-                                          v == null ? "Pilih model" : null,
+                                  // Kilometer — floating label + icon
+                                  TextFormField(
+                                    controller: kilometer,
+                                    keyboardType: TextInputType.number,
+                                    decoration: _input(
+                                      "Kilometer (opsional)",
+                                      icon: Icons.speed_rounded,
                                     ),
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) return null;
+                                      if (int.tryParse(v) == null) {
+                                        return "Masukkan angka valid";
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                  SizedBox(height: 30.h),
 
-                                    SizedBox(height: 18.h),
-
-                                    DropdownButtonFormField<String>(
-                                      value: tahun,
-                                      decoration: _dekor(
-                                        "Tahun",
-                                        Icons.date_range,
-                                      ),
-                                      items:
-                                          List.generate(
-                                                16,
-                                                (i) => (2010 + i).toString(),
-                                              )
-                                              .map(
-                                                (t) => DropdownMenuItem(
-                                                  value: t,
-                                                  child: Text(t),
-                                                ),
-                                              )
-                                              .toList(),
-                                      onChanged: (v) =>
-                                          setState(() => tahun = v),
-                                      validator: (v) =>
-                                          v == null ? "Pilih tahun" : null,
-                                    ),
-
-                                    SizedBox(height: 18.h),
-
-                                    TextFormField(
-                                      controller: kilometer,
-                                      keyboardType: TextInputType.number,
-                                      decoration: _dekor(
-                                        "Kilometer (opsional)",
-                                        Icons.speed,
-                                      ),
-                                      validator: (v) {
-                                        if (v == null || v.isEmpty) return null;
-                                        if (int.tryParse(v) == null)
-                                          return "Masukkan angka yang valid";
-                                        return null;
-                                      },
-                                    ),
-
-                                    SizedBox(height: 26.h),
-
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 52.h,
-                                      child: ElevatedButton(
-                                        onPressed: loading ? null : simpanData,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: const Color(
-                                            0xFFDB0C0C,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              14.r,
-                                            ),
+                                  // Button Simpan
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 50.h,
+                                    child: ElevatedButton(
+                                      onPressed: loading ? null : simpanData,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFFDB0C0C,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12.r,
                                           ),
                                         ),
-                                        child: loading
-                                            ? const CircularProgressIndicator(
-                                                color: Colors.white,
-                                                strokeWidth: 2,
-                                              )
-                                            : Text(
-                                                "Simpan Data",
-                                                style: TextStyle(
-                                                  fontSize: 16.sp,
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                              ),
                                       ),
+                                      child: loading
+                                          ? const CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2,
+                                            )
+                                          : const Text(
+                                              "Simpan Data",
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
@@ -381,8 +377,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
   }
 }
 
+// ---------------------------------------------------------
+// ORNAMEN SAMA DENGAN LOGIN/REGISTER
+// ---------------------------------------------------------
 class OrnamenSetengahLingkaranAtas extends StatelessWidget {
   const OrnamenSetengahLingkaranAtas({super.key});
+
   @override
   Widget build(BuildContext context) {
     final diameter = 1.6.sw;
@@ -391,22 +391,22 @@ class OrnamenSetengahLingkaranAtas extends StatelessWidget {
       child: SizedBox(
         width: double.infinity,
         height: 0.3.sh,
-        child: CustomPaint(painter: _MatahariTerbit(diameter)),
+        child: CustomPaint(painter: _LukisMatahariTerbit(diameter)),
       ),
     );
   }
 }
 
-class _MatahariTerbit extends CustomPainter {
+class _LukisMatahariTerbit extends CustomPainter {
   final double diameter;
-  const _MatahariTerbit(this.diameter);
+  const _LukisMatahariTerbit(this.diameter);
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, 0);
-    final area = Rect.fromCircle(center: center, radius: diameter / 2);
+    final tengah = Offset(size.width / 2, 0);
+    final area = Rect.fromCircle(center: tengah, radius: diameter / 2);
 
-    final paint = Paint()
+    final kuas = Paint()
       ..shader = const RadialGradient(
         colors: [
           Color(0xFFFFF59D),
@@ -419,7 +419,7 @@ class _MatahariTerbit extends CustomPainter {
         radius: 1.0,
       ).createShader(area);
 
-    canvas.drawCircle(center, diameter / 2, paint);
+    canvas.drawCircle(tengah, diameter / 2, kuas);
   }
 
   @override
