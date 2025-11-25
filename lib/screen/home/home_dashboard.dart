@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../bengkel/bengkel_detail.dart';
+import '../profile/profile.dart';
+import '../../widgets/navbar.dart';
+import '../chat/chat.dart';
+import '../riwayat/riwayat.dart';
+
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
 
@@ -30,6 +36,14 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
+  // buka halaman detail bengkel
+  void _openBengkelDetail() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const BengkelDetailPage()),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,27 +59,9 @@ class _HomeDashboardState extends State<HomeDashboard> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: Navbar(
         currentIndex: _selectedIndex,
-        selectedItemColor: const Color(0xFFDB0C0C),
-        unselectedItemColor: Colors.grey,
-        type: BottomNavigationBarType.fixed,
         onTap: (i) => setState(() => _selectedIndex = i),
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: 'Beranda',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'Riwayat'),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
-            label: 'Chat',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            label: 'Akun',
-          ),
-        ],
       ),
     );
   }
@@ -194,7 +190,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
       ),
       // geser isi header naik sedikit
       child: Transform.translate(
-        offset: Offset(0, -73.h), // atur -10.h / -15.h sesuai selera
+        offset: Offset(0, -73.h),
         child: Padding(
           padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
           child: Row(
@@ -499,7 +495,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
               height: 110.h,
               width: double.infinity,
               child: Image.asset(
-                'assets/promo_banner.png', // ganti dengan asset kamu
+                'assets/promo_banner.png',
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) {
                   // fallback kalau asset belum ada
@@ -577,9 +573,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
   Widget _buildRecommendationRow() {
     return Row(
       children: [
-        Expanded(child: _buildWorkshopCard(compact: true)),
+        Expanded(
+          child: _buildWorkshopCard(compact: true, onTap: _openBengkelDetail),
+        ),
         SizedBox(width: 12.w),
-        Expanded(child: _buildWorkshopCard(compact: true)),
+        Expanded(
+          child: _buildWorkshopCard(compact: true, onTap: _openBengkelDetail),
+        ),
       ],
     );
   }
@@ -587,15 +587,15 @@ class _HomeDashboardState extends State<HomeDashboard> {
   Widget _buildRecommendationList() {
     return Column(
       children: [
-        _buildWorkshopCard(),
+        _buildWorkshopCard(onTap: _openBengkelDetail),
         SizedBox(height: 12.h),
-        _buildWorkshopCard(),
+        _buildWorkshopCard(onTap: _openBengkelDetail),
       ],
     );
   }
 
-  Widget _buildWorkshopCard({bool compact = false}) {
-    return Container(
+  Widget _buildWorkshopCard({bool compact = false, VoidCallback? onTap}) {
+    final card = Container(
       height: compact ? 210.h : 110.h,
       decoration: BoxDecoration(
         color: Colors.white,
@@ -630,6 +630,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 ),
               ],
             ),
+    );
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(onTap: onTap, child: card),
     );
   }
 
@@ -701,32 +706,21 @@ class _HomeDashboardState extends State<HomeDashboard> {
   // =====================================================
 
   Widget _buildRiwayatTab() {
-    return Center(
-      child: Text(
-        "Riwayat booking\n(dalam pengerjaan)",
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16.sp),
-      ),
-    );
+    return const RiwayatTab();
   }
 
   Widget _buildChatTab() {
-    return Center(
-      child: Text(
-        "Chat bengkel\n(dalam pengerjaan)",
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16.sp),
-      ),
-    );
+    return const ChatTab();
   }
 
   Widget _buildAkunTab() {
-    return Center(
-      child: Text(
-        "Profil akun\n(dalam pengerjaan)",
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 16.sp),
-      ),
+    return ProfileTab(
+      name: _displayName,
+      email: _user?.email ?? "-",
+      phone: null, // nanti bisa diisi dari Firestore
+      onLogout: () {
+        // TODO: isi signOut kalau mau
+      },
     );
   }
 }
