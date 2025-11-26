@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../models/bengkel_model.dart';
 import '../bengkel/bengkel_detail.dart';
 import '../profile/profile.dart';
 import '../../widgets/navbar.dart';
@@ -36,7 +38,15 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
-  // buka halaman detail bengkel
+  /// Stream bengkel dari Firestore
+  Stream<List<Bengkel>> get _bengkelStream {
+    return FirebaseFirestore.instance
+        .collection('bengkel')
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => Bengkel.fromDoc(d)).toList());
+  }
+
+  // buka halaman detail bengkel (sementara tanpa kirim data)
   void _openBengkelDetail() {
     Navigator.push(
       context,
@@ -144,6 +154,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
                 SizedBox(height: 16.h),
 
+                // ================== REKOMENDASI DARI FIRESTORE ==================
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Text(
@@ -159,14 +170,55 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: _buildRecommendationRow(),
-                ),
+                  child: StreamBuilder<List<Bengkel>>(
+                    stream: _bengkelStream,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
 
-                SizedBox(height: 16.h),
+                      if (snapshot.hasError) {
+                        return const Text("Gagal memuat bengkel");
+                      }
 
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: _buildRecommendationList(),
+                      final list = snapshot.data ?? [];
+
+                      if (list.isEmpty) {
+                        return const Text("Belum ada bengkel terdaftar");
+                      }
+
+                      // Layout sama seperti desain:
+                      // 2 kartu kecil di atas, sisanya list besar di bawah
+                      return Column(
+                        children: [
+                          // ROW 2 KARTU KECIL
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildBengkelCompactCard(list[0]),
+                              ),
+                              if (list.length > 1) ...[
+                                SizedBox(width: 12.w),
+                                Expanded(
+                                  child: _buildBengkelCompactCard(list[1]),
+                                ),
+                              ],
+                            ],
+                          ),
+
+                          if (list.length > 2) ...[
+                            SizedBox(height: 16.h),
+
+                            // LIST BESAR DI BAWAH
+                            for (int i = 2; i < list.length; i++) ...[
+                              _buildBengkelListCard(list[i]),
+                              SizedBox(height: 12.h),
+                            ],
+                          ],
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
@@ -405,69 +457,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   // =====================================================
-  //                      KARTU XP / EXP
-  // =====================================================
-
-  Widget _buildXpCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-      child: Row(
-        children: [
-          Container(
-            width: 48.w,
-            height: 48.w,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF3CD),
-              borderRadius: BorderRadius.circular(16.r),
-            ),
-            child: Center(
-              child: Text("😎", style: TextStyle(fontSize: 26.sp)),
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "117 XP lagi ada Harta Karun",
-                  style: TextStyle(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                SizedBox(height: 6.h),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10.r),
-                  child: LinearProgressIndicator(
-                    value: 0.6, // progress contoh
-                    minHeight: 6.h,
-                    backgroundColor: Colors.grey.shade200,
-                    valueColor: const AlwaysStoppedAnimation(Color(0xFFDB0C0C)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: 8.w),
-          Icon(Icons.chevron_right, color: Colors.grey[600]),
-        ],
-      ),
-    );
-  }
-
-  // =====================================================
   //                         PROMO (DENGAN GAMBAR)
   // =====================================================
 
@@ -567,39 +556,14 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   // =====================================================
-  //                REKOMENDASI (ATAS & LIST)
+  //                      KARTU XP / EXP
   // =====================================================
 
-  Widget _buildRecommendationRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildWorkshopCard(compact: true, onTap: _openBengkelDetail),
-        ),
-        SizedBox(width: 12.w),
-        Expanded(
-          child: _buildWorkshopCard(compact: true, onTap: _openBengkelDetail),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRecommendationList() {
-    return Column(
-      children: [
-        _buildWorkshopCard(onTap: _openBengkelDetail),
-        SizedBox(height: 12.h),
-        _buildWorkshopCard(onTap: _openBengkelDetail),
-      ],
-    );
-  }
-
-  Widget _buildWorkshopCard({bool compact = false, VoidCallback? onTap}) {
-    final card = Container(
-      height: compact ? 210.h : 110.h,
+  Widget _buildXpCard() {
+    return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18.r),
+        borderRadius: BorderRadius.circular(20.r),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -608,33 +572,243 @@ class _HomeDashboardState extends State<HomeDashboard> {
           ),
         ],
       ),
-      clipBehavior: Clip.antiAlias,
-      child: compact
-          ? Column(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      child: Row(
+        children: [
+          Container(
+            width: 48.w,
+            height: 48.w,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3CD),
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            child: Center(
+              child: Text("😎", style: TextStyle(fontSize: 26.sp)),
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildWorkshopImage(height: 110.h),
-                Padding(
-                  padding: EdgeInsets.all(10.w),
-                  child: _buildWorkshopInfo(),
+                Text(
+                  "117 XP lagi ada Harta Karun",
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ],
-            )
-          : Row(
-              children: [
-                _buildWorkshopImage(width: 110.w),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.all(10.w),
-                    child: _buildWorkshopInfo(withTag: true),
+                SizedBox(height: 6.h),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10.r),
+                  child: LinearProgressIndicator(
+                    value: 0.6, // progress contoh
+                    minHeight: 6.h,
+                    backgroundColor: Colors.grey.shade200,
+                    valueColor: const AlwaysStoppedAnimation(Color(0xFFDB0C0C)),
                   ),
                 ),
               ],
             ),
+          ),
+          SizedBox(width: 8.w),
+          Icon(Icons.chevron_right, color: Colors.grey[600]),
+        ],
+      ),
     );
+  }
 
+  // =====================================================
+  //      CARD REKOMENDASI DARI OBJECT BENGKEL (FIRESTORE)
+  // =====================================================
+
+  /// Kartu kecil (compact) untuk 2 rekomendasi di baris atas
+  Widget _buildBengkelCompactCard(Bengkel b) {
     return Material(
       color: Colors.transparent,
-      child: InkWell(onTap: onTap, child: card),
+      child: InkWell(
+        onTap: _openBengkelDetail, // nanti bisa kirim data b
+        child: Container(
+          height: 210.h,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            children: [
+              _buildWorkshopImage(height: 110.h),
+              Padding(
+                padding: EdgeInsets.all(10.w),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "5.8 km", // sementara statis, nanti bisa dihitung dari lokasi
+                      style: TextStyle(fontSize: 11.sp, color: Colors.grey),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      b.nama,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          color: Colors.orange,
+                          size: 16,
+                        ),
+                        SizedBox(width: 4.w),
+                        Text(
+                          "${b.rating.toStringAsFixed(1)} • 300+ rating",
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Kartu besar list di bagian bawah
+  /// Kartu besar list di bagian bawah
+  Widget _buildBengkelListCard(Bengkel b) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: _openBengkelDetail,
+        child: Container(
+          height: 110.h,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(18.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Row(
+            children: [
+              _buildWorkshopImage(width: 110.w),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.all(10.w),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // jarak (sementara statis)
+                      Text(
+                        "5.8 km",
+                        style: TextStyle(fontSize: 11.sp, color: Colors.grey),
+                      ),
+                      SizedBox(height: 2.h),
+
+                      // nama
+                      Text(
+                        b.nama,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+
+                      // rating
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.star_rounded,
+                            color: Colors.orange,
+                            size: 16,
+                          ),
+                          SizedBox(width: 4.w),
+                          Text(
+                            "${b.rating.toStringAsFixed(1)} • Bengkel terpercaya",
+                            style: TextStyle(
+                              fontSize: 11.sp,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6.h),
+
+                      // deskripsi + badge BUKA/TUTUP
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              b.deskripsi ?? "Tambal Ban",
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                color: Colors.grey[800],
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10.w,
+                              vertical: 4.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: b.buka
+                                  ? const Color(0xFFE8F5E9) // hijau soft
+                                  : const Color(0xFFFFEBEE), // merah soft
+                              borderRadius: BorderRadius.circular(12.r),
+                            ),
+                            child: Text(
+                              b.buka ? "Buka" : "Tutup",
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w600,
+                                color: b.buka
+                                    ? const Color(0xFF2E7D32) // hijau tua
+                                    : const Color(0xFFB71C1C), // merah tua
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -644,60 +818,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
       height: height,
       color: Colors.grey.shade200,
       child: const Icon(Icons.car_repair, size: 40, color: Colors.grey),
-    );
-  }
-
-  Widget _buildWorkshopInfo({bool withTag = false}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "5.8 km",
-          style: TextStyle(fontSize: 11.sp, color: Colors.grey),
-        ),
-        SizedBox(height: 2.h),
-        Text(
-          "Bengkel Watanabe Karangsalam",
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
-        ),
-        SizedBox(height: 4.h),
-        Row(
-          children: [
-            const Icon(Icons.star_rounded, color: Colors.orange, size: 16),
-            SizedBox(width: 4.w),
-            Text(
-              "4.8 • 300+ rating",
-              style: TextStyle(fontSize: 11.sp, color: Colors.grey),
-            ),
-          ],
-        ),
-        if (withTag) ...[
-          SizedBox(height: 6.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("Tambal Ban", style: TextStyle(fontSize: 11.sp)),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
-                  borderRadius: BorderRadius.circular(12.r),
-                ),
-                child: Text(
-                  "Buka",
-                  style: TextStyle(
-                    color: const Color(0xFF2E7D32),
-                    fontSize: 11.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ],
     );
   }
 
