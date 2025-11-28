@@ -1,14 +1,14 @@
-// ignore_for_file: deprecated_member_use, depend_on_referenced_packages
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../home/home_dashboard.dart';
 import 'vehicle_form_screen.dart';
+import 'package:bengkelku/services/auth.dart';
+import 'package:bengkelku/widgets/ornamen_Lingkaran.dart';
 
 class Masuk extends StatefulWidget {
   const Masuk({super.key});
@@ -27,12 +27,35 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
 
   bool _rememberMe = false;
   bool _isLoading = false;
-
   bool _sembunyikanPassword = true;
+
+  // Error dari Firebase (untuk tampil di TextFormField)
+  String? _emailErrorText;
+  String? _passwordErrorText;
+
+  // cooldown untuk too-many-requests
+  int _lockSeconds = 0;
+  Timer? _lockTimer;
 
   late AnimationController _pengendaliAnimasi;
   late Animation<double> _animasiFade;
   late Animation<Offset> _animasiGeser;
+
+  // ==========================
+  // FORMAT WAKTU LOCK
+  // ==========================
+  String _formatLockRemaining() {
+    final minutes = _lockSeconds ~/ 60;
+    final seconds = _lockSeconds % 60;
+
+    if (minutes > 0) {
+      return "$minutes menit ${seconds.toString().padLeft(2, '0')} dtk";
+    } else {
+      return "$seconds dtk";
+    }
+  }
+
+  bool get _isLocked => _lockSeconds > 0;
 
   @override
   void initState() {
@@ -59,103 +82,254 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
     _pengendaliAnimasi.forward();
 
     _loadRememberMe();
-  }
 
-  Future<void> _loadRememberMe() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedEmail = prefs.getString("saved_email");
-    final savedRemember = prefs.getBool("remember_me") ?? false;
-
-    if (savedEmail != null) {
-      setState(() {
-        _emailController.text = savedEmail;
-        _rememberMe = savedRemember;
-      });
-    }
+    // reset error ketika user mengetik lagi
+    _emailController.addListener(() {
+      if (_emailErrorText != null && mounted) {
+        setState(() => _emailErrorText = null);
+      }
+    });
+    _passwordController.addListener(() {
+      if (_passwordErrorText != null && mounted) {
+        setState(() => _passwordErrorText = null);
+      }
+    });
   }
 
   @override
   void dispose() {
+    _lockTimer?.cancel();
     _pengendaliAnimasi.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  // ==========================
+  // REMEMBER ME: LOAD DATA
+  // ==========================
+  Future<void> _loadRememberMe() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedEmail = prefs.getString("saved_email");
+    final savedRemember = prefs.getBool("remember_me") ?? false;
+
+    if (!mounted) return;
+
+    if (savedEmail != null && savedRemember) {
+      setState(() {
+        _emailController.text = savedEmail;
+        _rememberMe = true;
+      });
+    }
+  }
+
+  // ==========================
+  // LOCKDOWN TIMER
+  // ==========================
+  void _startLockdown(int seconds) {
+    setState(() {
+      _lockSeconds = seconds;
+    });
+
+    _lockTimer?.cancel();
+    _lockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_lockSeconds <= 1) {
+        timer.cancel();
+        if (!mounted) return;
+        setState(() {
+          _lockSeconds = 0;
+        });
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _lockSeconds--;
+        });
+      }
+    });
+  }
+
   // =====================================================================
-  //                     LOGIN USER
+  //                          HELPER
+  // =====================================================================
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: isError ? Colors.red.shade700 : null,
+          content: Text(message),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  Future<void> _handleAfterLogin(User user) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMe && user.email != null) {
+      prefs.setString("saved_email", user.email!);
+      prefs.setBool("remember_me", true);
+    } else {
+      prefs.remove("saved_email");
+      prefs.setBool("remember_me", false);
+    }
+
+    final hasVehicle = await AuthService.instance.hasVehicleData(user.uid);
+
+    if (!mounted) return;
+
+    if (!hasVehicle) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const VehicleFormScreen()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeDashboard()),
+      );
+    }
+  }
+
+  // =====================================================================
+  //                     LOGIN DENGAN GOOGLE
+  // =====================================================================
+  Future<void> _loginWithGoogle() async {
+    if (_isLoading || _isLocked) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final user = await AuthService.instance.signInWithGoogle();
+      if (user == null) return; // user cancel
+
+      await _handleAfterLogin(user);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      String msg = "Login Google gagal. Coba lagi.";
+      bool isError = false;
+
+      if (e.code == 'network-request-failed') {
+        msg = "Koneksi internet bermasalah.";
+        isError = true;
+      } else if (e.code == 'account-exists-with-different-credential') {
+        msg =
+            "Email ini sudah terdaftar dengan metode lain. Coba login dengan email & kata sandi.";
+      }
+
+      _showSnackBar(msg, isError: isError);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Koneksi internet bermasalah.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // =====================================================================
+  //                    LOGIN DENGAN FACEBOOK
+  // =====================================================================
+  Future<void> _loginWithFacebook() async {
+    if (_isLoading || _isLocked) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final user = await AuthService.instance.signInWithFacebook();
+      if (user == null) return;
+
+      await _handleAfterLogin(user);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      String msg;
+      bool isError = false;
+
+      if (e.code == 'network-request-failed') {
+        msg = "Koneksi internet bermasalah.";
+        isError = true;
+      } else {
+        msg = e.message ?? 'Login Facebook gagal';
+      }
+
+      _showSnackBar(msg, isError: isError);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Koneksi internet bermasalah.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  // =====================================================================
+  //                     LOGIN EMAIL & PASSWORD
   // =====================================================================
   Future<void> _loginUser() async {
-    if (_isLoading) return;
+    if (_isLoading || _isLocked) return;
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _emailErrorText = null;
+      _passwordErrorText = null;
+    });
 
     try {
       final email = _emailController.text.trim();
       final password = _passwordController.text.trim();
 
-      // LOGIN
-      final cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+      final user = await AuthService.instance.login(
         email: email,
         password: password,
       );
 
-      final user = cred.user;
-      if (user == null) return;
-
-      // REMEMBER ME
-      final prefs = await SharedPreferences.getInstance();
-      if (_rememberMe) {
-        prefs.setString("saved_email", email);
-        prefs.setBool("remember_me", true);
-      } else {
-        prefs.remove("saved_email");
-        prefs.setBool("remember_me", false);
-      }
-
-      // CEK KENDARAAN DI FIRESTORE
-      final vehicleDoc = await FirebaseFirestore.instance
-          .collection("users")
-          .doc(user.uid)
-          .collection("vehicle")
-          .doc("main")
-          .get();
-
+      // user hampir pasti tidak null di sini;
+      // kalau ada masalah, Firebase akan lempar exception
+      await _handleAfterLogin(user!);
+    } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
-      if (!vehicleDoc.exists) {
-        // USER BARU → Belum isi data kendaraan
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const VehicleFormScreen()),
-        );
-      } else {
-        // USER LAMA → Sudah isi data kendaraan
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const HomeDashboard()),
-        );
-      }
-    } on FirebaseAuthException catch (e) {
-      String msg = "Terjadi kesalahan";
+      String? snackMessage;
 
-      switch (e.code) {
-        case "invalid-email":
-          msg = "Format email salah";
-          break;
-        case "user-not-found":
-          msg = "Email tidak terdaftar";
-          break;
-        case "wrong-password":
-          msg = "Password salah";
-          break;
-        case "network-request-failed":
-          msg = "Koneksi internet bermasalah";
-          break;
-      }
+      setState(() {
+        _emailErrorText = null;
+        _passwordErrorText = null;
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+        switch (e.code) {
+          case "invalid-email":
+            _emailErrorText = "Format email salah";
+            break;
+
+          // semua error kredensial → 1 pesan umum di password
+          case "user-not-found":
+          case "wrong-password":
+          case "invalid-credential":
+            _passwordErrorText = "Email atau kata sandi salah";
+            break;
+
+          case "too-many-requests":
+            snackMessage =
+                "Terlalu banyak percobaan gagal. Silakan coba lagi nanti atau reset kata sandi.";
+            // misal 30 menit (1800 detik)
+            _startLockdown(1800);
+            break;
+
+          case "network-request-failed":
+            snackMessage = "Koneksi internet bermasalah.";
+            break;
+
+          default:
+            snackMessage = "Terjadi kesalahan. Coba lagi.";
+        }
+      });
+
+      if (snackMessage != null) {
+        _showSnackBar(snackMessage!, isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -173,7 +347,6 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
         child: Stack(
           children: [
             const OrnamenSetengahLingkaranAtas(),
-
             Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: 500.w),
@@ -182,7 +355,6 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                     horizontal: 28.w,
                     vertical: 25.h,
                   ),
-
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -254,6 +426,7 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                         TextFormField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           validator: (v) {
                             if (v == null || v.isEmpty) {
                               return "Email wajib diisi";
@@ -272,6 +445,7 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                               borderRadius: BorderRadius.circular(12.r),
                             ),
                             prefixIcon: const Icon(Icons.email_outlined),
+                            errorText: _emailErrorText,
                           ),
                         ),
 
@@ -281,6 +455,7 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                         TextFormField(
                           controller: _passwordController,
                           obscureText: _sembunyikanPassword,
+                          autovalidateMode: AutovalidateMode.onUserInteraction,
                           validator: (v) {
                             if (v == null || v.isEmpty) {
                               return "Kata sandi wajib diisi";
@@ -299,11 +474,13 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                                     ? Icons.visibility_off
                                     : Icons.visibility,
                               ),
-                              onPressed: () => setState(
-                                () => _sembunyikanPassword =
-                                    !_sembunyikanPassword,
-                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _sembunyikanPassword = !_sembunyikanPassword;
+                                });
+                              },
                             ),
+                            errorText: _passwordErrorText,
                           ),
                         ),
 
@@ -355,7 +532,9 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                           width: double.infinity,
                           height: 48.h,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _loginUser,
+                            onPressed: (_isLoading || _isLocked)
+                                ? null
+                                : _loginUser,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFDB0C0C),
                               shape: RoundedRectangleBorder(
@@ -368,7 +547,9 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                                     strokeWidth: 2,
                                   )
                                 : Text(
-                                    "Masuk",
+                                    _isLocked
+                                        ? "Coba lagi dalam ${_formatLockRemaining()}"
+                                        : "Masuk",
                                     style: TextStyle(
                                       fontSize: 16.sp,
                                       fontWeight: FontWeight.w600,
@@ -410,11 +591,13 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
                         _tombolSosial(
                           'Lanjut dengan Google',
                           'assets/google.webp',
+                          _loginWithGoogle,
                         ),
                         SizedBox(height: 15.h),
                         _tombolSosial(
                           'Lanjut dengan Facebook',
                           'assets/fb.webp',
+                          _loginWithFacebook,
                         ),
 
                         SizedBox(height: 25.h),
@@ -460,13 +643,15 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
   }
 
   // TOMBOL SOSIAL
-  Widget _tombolSosial(String teks, String pathIkon) {
+  Widget _tombolSosial(String teks, String pathIkon, VoidCallback onPressed) {
+    final bool disabled = _isLoading || _isLocked;
+
     return SizedBox(
       width: double.infinity,
       height: 48.h,
       child: OutlinedButton.icon(
         icon: Image.asset(pathIkon, width: 22.w),
-        onPressed: () {},
+        onPressed: disabled ? null : onPressed,
         style: OutlinedButton.styleFrom(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.r),
@@ -474,56 +659,12 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
         ),
         label: Text(
           teks,
-          style: TextStyle(fontSize: 15.sp, color: Colors.black87),
+          style: TextStyle(
+            fontSize: 15.sp,
+            color: disabled ? Colors.grey : Colors.black87,
+          ),
         ),
       ),
     );
   }
-}
-
-// ORNAMEN TETAP
-class OrnamenSetengahLingkaranAtas extends StatelessWidget {
-  const OrnamenSetengahLingkaranAtas({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final double diameter = 1.6.sw;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SizedBox(
-        width: double.infinity,
-        height: 0.3.sh,
-        child: CustomPaint(painter: _LukisMatahariTerbit(diameter)),
-      ),
-    );
-  }
-}
-
-class _LukisMatahariTerbit extends CustomPainter {
-  final double diameter;
-  _LukisMatahariTerbit(this.diameter);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Offset tengah = Offset(size.width / 2, 0);
-    final Rect area = Rect.fromCircle(center: tengah, radius: diameter / 2);
-
-    final Paint kuas = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFFFFF59D),
-          const Color(0xFFFFEE58),
-          const Color.fromARGB(60, 255, 214, 64),
-          Colors.white.withOpacity(0.0),
-        ],
-        stops: const [0.0, 0.3, 0.6, 1.0],
-        center: Alignment.topCenter,
-        radius: 1.0,
-      ).createShader(area);
-
-    canvas.drawCircle(tengah, diameter / 2, kuas);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

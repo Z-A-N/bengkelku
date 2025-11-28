@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -178,7 +180,7 @@ class _ProfileTabState extends State<ProfileTab> {
             label: "Notifikasi",
             trailing: Switch(
               value: _notifOn,
-              activeColor: const Color(0xFFDB0C0C),
+              activeThumbColor: const Color(0xFFDB0C0C),
               onChanged: (val) {
                 setState(() => _notifOn = val);
               },

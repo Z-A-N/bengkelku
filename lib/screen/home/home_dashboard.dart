@@ -1,3 +1,5 @@
+// ignore_for_file: dead_code, unnecessary_underscores, deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -81,7 +83,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
   // =====================================================
 
   Widget _buildHomeTab(BuildContext context) {
-    const double _mapHeightFactor = 160;
+    const double mapHeightFactor = 160;
 
     return SingleChildScrollView(
       child: Stack(
@@ -104,7 +106,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
           Padding(
             padding: EdgeInsets.only(
-              top: (145 + _mapHeightFactor + 24).h,
+              top: (145 + mapHeightFactor + 24).h,
               bottom: 16.h,
             ),
             child: Column(
@@ -767,7 +769,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         children: [
                           Expanded(
                             child: Text(
-                              b.deskripsi ?? "Tambal Ban",
+                              b.deskripsi,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(

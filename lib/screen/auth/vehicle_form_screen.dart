@@ -2,8 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:bengkelku/widgets/ornamen_Lingkaran.dart';
+import 'package:bengkelku/services/auth.dart';
 
 // ---------------------------------------------------------
 // Uppercase formatter untuk plat nomor
@@ -140,20 +141,15 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
 
     final uid = FirebaseAuth.instance.currentUser!.uid;
 
-    await FirebaseFirestore.instance
-        .collection("users")
-        .doc(uid)
-        .collection("vehicle")
-        .doc("main")
-        .set({
-          "jenis": jenisKendaraan,
-          "nomorPolisi": nomorPolisi.text.trim(),
-          "merek": merek,
-          "model": model,
-          "tahun": tahun,
-          "km": kilometer.text.trim(),
-          "updatedAt": DateTime.now(),
-        }, SetOptions(merge: true));
+    await AuthService.instance.saveVehicleData(
+      uid: uid,
+      jenis: jenisKendaraan,
+      nomorPolisi: nomorPolisi.text.trim(),
+      merek: merek,
+      model: model,
+      tahun: tahun,
+      km: kilometer.text.trim().isEmpty ? null : kilometer.text.trim(),
+    );
 
     setState(() => loading = false);
 
@@ -375,53 +371,4 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
       ),
     );
   }
-}
-
-// ---------------------------------------------------------
-// ORNAMEN SAMA DENGAN LOGIN/REGISTER
-// ---------------------------------------------------------
-class OrnamenSetengahLingkaranAtas extends StatelessWidget {
-  const OrnamenSetengahLingkaranAtas({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final diameter = 1.6.sw;
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SizedBox(
-        width: double.infinity,
-        height: 0.3.sh,
-        child: CustomPaint(painter: _LukisMatahariTerbit(diameter)),
-      ),
-    );
-  }
-}
-
-class _LukisMatahariTerbit extends CustomPainter {
-  final double diameter;
-  const _LukisMatahariTerbit(this.diameter);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final tengah = Offset(size.width / 2, 0);
-    final area = Rect.fromCircle(center: tengah, radius: diameter / 2);
-
-    final kuas = Paint()
-      ..shader = const RadialGradient(
-        colors: [
-          Color(0xFFFFF59D),
-          Color(0xFFFFEE58),
-          Color.fromARGB(60, 255, 214, 64),
-          Colors.transparent,
-        ],
-        stops: [0.0, 0.3, 0.6, 1.0],
-        center: Alignment.topCenter,
-        radius: 1.0,
-      ).createShader(area);
-
-    canvas.drawCircle(tengah, diameter / 2, kuas);
-  }
-
-  @override
-  bool shouldRepaint(_) => false;
 }

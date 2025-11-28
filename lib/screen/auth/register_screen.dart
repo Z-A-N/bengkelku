@@ -3,7 +3,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'login_screen.dart'; // ⬅ penting untuk redirect setelah daftar
+import 'login_screen.dart';
+import 'package:bengkelku/services/auth.dart';
+import 'package:bengkelku/widgets/ornamen_Lingkaran.dart';
 
 class Daftar extends StatefulWidget {
   const Daftar({super.key});
@@ -155,52 +157,79 @@ class _DaftarState extends State<Daftar> with SingleTickerProviderStateMixin {
       final password = _passwordController.text.trim();
       final nama = _namaController.text.trim();
 
-      final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+      // Daftar lewat AuthService
+      await AuthService.instance.register(
+        name: nama,
         email: email,
         password: password,
       );
 
-      final user = FirebaseAuth.instance.currentUser ?? cred.user;
+      if (!mounted) return;
 
-      if (user != null) {
-        await user.updateDisplayName(nama);
-      }
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Akun berhasil dibuat! Silakan login.')),
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            backgroundColor: const Color(0xFF2E7D32), // hijau sukses
+            content: Row(
+              children: const [
+                Icon(Icons.check_circle, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Akun berhasil dibuat! Silakan login.',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+          ),
         );
 
-        // ⬅ PERUBAHAN TERPENTING: langsung ke login
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const Masuk()),
-          (route) => false,
-        );
-      }
+      // Langsung ke halaman login, hapus semua route sebelumnya
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const Masuk()),
+        (route) => false,
+      );
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
+      String? emailError;
+      String? snackMessage;
+
+      switch (e.code) {
+        case 'email-already-in-use':
+          emailError = 'Email sudah digunakan.';
+          break;
+        case 'invalid-email':
+          emailError = 'Format email tidak valid.';
+          break;
+        case 'weak-password':
+          snackMessage = 'Kata sandi terlalu lemah.';
+          break;
+        case 'network-request-failed':
+          emailError = 'Tidak dapat terhubung ke jaringan.';
+          break;
+        default:
+          emailError = e.message ?? 'Terjadi kesalahan.';
+      }
+
       setState(() {
-        switch (e.code) {
-          case 'email-already-in-use':
-            _emailErrorText = 'Email sudah digunakan.';
-            break;
-          case 'invalid-email':
-            _emailErrorText = 'Format email tidak valid.';
-            break;
-          case 'weak-password':
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Kata sandi terlalu lemah.')),
-            );
-            break;
-          case 'network-request-failed':
-            _emailErrorText = 'Tidak dapat terhubung ke jaringan.';
-            break;
-          default:
-            _emailErrorText = e.message ?? 'Terjadi kesalahan.';
-        }
+        _emailErrorText = emailError;
       });
+
+      if (snackMessage != null) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(snackMessage)));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -526,61 +555,5 @@ class _Segment extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-// -------------------------------------------
-// ORNAMEN
-// -------------------------------------------
-
-class OrnamenSetengahLingkaranAtas extends StatelessWidget {
-  const OrnamenSetengahLingkaranAtas({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final double diameter = 1.6.sw;
-
-    return Align(
-      alignment: Alignment.topCenter,
-      child: SizedBox(
-        width: double.infinity,
-        height: 0.3.sh,
-        child: CustomPaint(painter: _LukisMatahariTerbit(diameter)),
-      ),
-    );
-  }
-}
-
-class _LukisMatahariTerbit extends CustomPainter {
-  final double diameter;
-  const _LukisMatahariTerbit(this.diameter);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Offset tengah = Offset(size.width / 2, 0);
-    final Rect area = Rect.fromCircle(center: tengah, radius: diameter / 2);
-
-    final Paint kuas = Paint()
-      ..shader = const RadialGradient(
-        colors: [
-          Color(0xFFFFF59D),
-          Color(0xFFFFEE58),
-          Color.fromARGB(60, 255, 214, 64),
-          Colors.transparent,
-        ],
-        stops: [0.0, 0.3, 0.6, 1.0],
-        center: Alignment.topCenter,
-        radius: 1.0,
-      ).createShader(area);
-
-    canvas.drawCircle(tengah, diameter / 2, kuas);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) {
-    if (oldDelegate is _LukisMatahariTerbit) {
-      return oldDelegate.diameter != diameter;
-    }
-    return true;
   }
 }

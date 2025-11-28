@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import 'onboarding_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -13,9 +14,9 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
+  late final AnimationController _controller;
+  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _fadeAnimation;
 
   @override
   void initState() {
@@ -35,7 +36,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // navigasi ke onboarding
+    // Navigasi ke onboarding setelah 3 detik
     Future.delayed(const Duration(seconds: 3), () {
       if (!mounted) return;
       Navigator.pushReplacement(
@@ -63,7 +64,7 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  Shader linearGradient(List<Color> colors) {
+  Shader _linearGradient(List<Color> colors) {
     return LinearGradient(
       colors: colors,
       begin: Alignment.topLeft,
@@ -86,21 +87,21 @@ class _SplashScreenState extends State<SplashScreen>
                 opacity: _fadeAnimation,
                 child: Image.asset(
                   'assets/logo.png',
-                  width: 120.w, // auto-scale
+                  width: 120.w,
                   height: 120.w,
                 ),
               ),
             ),
             SizedBox(height: 20.h),
 
-            // ✨ Teks BengkelKu dengan gradient dan outline
+            // Teks BengkelKu
             FadeTransition(
               opacity: _fadeAnimation,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  // ✨ BENGKEL
+                  // BENGKEL
                   Stack(
                     children: [
                       Text(
@@ -124,7 +125,7 @@ class _SplashScreenState extends State<SplashScreen>
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
                           foreground: Paint()
-                            ..shader = linearGradient([
+                            ..shader = _linearGradient([
                               const Color.fromARGB(255, 231, 56, 88),
                               const Color(0xFFE21B4D),
                               const Color(0xFFC0103A),
@@ -141,7 +142,7 @@ class _SplashScreenState extends State<SplashScreen>
                     ],
                   ),
 
-                  // ✨ KU.
+                  // KU.
                   Stack(
                     children: [
                       Text(
@@ -165,7 +166,7 @@ class _SplashScreenState extends State<SplashScreen>
                           fontFamily: 'Poppins',
                           letterSpacing: 1.2,
                           foreground: Paint()
-                            ..shader = linearGradient([
+                            ..shader = _linearGradient([
                               const Color(0xFFFFF799),
                               const Color(0xFFFFD320),
                               const Color(0xFFF9B700),

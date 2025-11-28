@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+
 import 'auth/login_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -22,8 +23,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool _isAnimating = false;
   bool _userDragging = false;
 
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
+  late final AnimationController _fadeController;
+  late final Animation<double> _fadeAnimation;
 
   static const List<Map<String, String>> onboardingData = [
     {
@@ -46,9 +47,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   static const _slideDuration = Duration(milliseconds: 600);
   static const _slideCurve = Curves.easeInOut;
 
+  bool get _isLastPage => _currentPage == onboardingData.length - 1;
+
   @override
   void initState() {
     super.initState();
+
     _fadeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -57,16 +61,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       parent: _fadeController,
       curve: Curves.easeInOut,
     );
+
     _startAutoSlide();
   }
 
   void _startAutoSlide() {
     _autoSlideTimer?.cancel();
+
     _autoSlideTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
       if (!_controller.hasClients || _isAnimating || _userDragging) return;
+
       _isAnimating = true;
       try {
-        int nextPage = _currentPage + 1;
+        final nextPage = _currentPage + 1;
+
         if (nextPage >= onboardingData.length) {
           await _fadeController.forward();
           await _controller.animateToPage(
@@ -101,7 +109,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     super.dispose();
   }
 
-  void _navigateToHome() {
+  void _navigateToLogin() {
     _stopAutoSlide();
     Navigator.pushReplacement(
       context,
@@ -111,8 +119,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   Future<void> _goToLastSlideWithFade() async {
     if (_isAnimating) return;
+
     _stopAutoSlide();
     _isAnimating = true;
+
     try {
       await _fadeController.forward();
       await _controller.animateToPage(
@@ -129,7 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    final height = 1.sh; // total tinggi layar responsif
+    final height = 1.sh;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -138,8 +148,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           children: [
             const BottomHalfCircleOrnament(),
 
+            // Konten utama + animasi fade
             FadeTransition(
-              opacity: _fadeAnimation.drive(Tween(begin: 1.0, end: 0.6)),
+              opacity: _fadeAnimation.drive(
+                Tween<double>(begin: 1.0, end: 0.6),
+              ),
               child: Column(
                 children: [
                   Expanded(
@@ -149,8 +162,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             !_userDragging) {
                           _userDragging = true;
                           _stopAutoSlide();
-                        }
-                        if (notification.direction == ScrollDirection.idle &&
+                        } else if (notification.direction ==
+                                ScrollDirection.idle &&
                             _userDragging) {
                           _userDragging = false;
                           _startAutoSlide();
@@ -159,10 +172,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       },
                       child: PageView.builder(
                         controller: _controller,
-                        onPageChanged: (index) {
-                          if (mounted) setState(() => _currentPage = index);
-                        },
                         itemCount: onboardingData.length,
+                        onPageChanged: (index) {
+                          if (!mounted) return;
+                          setState(() => _currentPage = index);
+                        },
                         itemBuilder: (context, index) {
                           final item = onboardingData[index];
                           final isLastSlide =
@@ -171,6 +185,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           final double topPadding = height < 700.h
                               ? (isLastSlide ? 95.h : 115.h)
                               : (isLastSlide ? 115.h : 135.h);
+
                           final double imageHeight = height < 700.h
                               ? (isLastSlide ? 170.h : 145.h)
                               : (isLastSlide ? 200.h : 170.h);
@@ -218,8 +233,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ),
                   ),
 
-                  // 🔘 Dots indikator
-                  if (_currentPage != onboardingData.length - 1)
+                  // 🔘 Dots indikator (kalau belum di slide terakhir)
+                  if (!_isLastPage) ...[
                     Padding(
                       padding: EdgeInsets.only(bottom: 15.h),
                       child: Row(
@@ -241,15 +256,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         ),
                       ),
                     ),
+                    SizedBox(height: 25.h),
+                  ],
 
-                  SizedBox(height: 25.h),
-
-                  // 🔸 Tombol CTA
-                  if (_currentPage == onboardingData.length - 1)
+                  // 🔸 Tombol CTA (hanya di slide terakhir)
+                  if (_isLastPage)
                     Padding(
                       padding: EdgeInsets.fromLTRB(80.w, 0, 80.w, 45.h),
                       child: ElevatedButton(
-                        onPressed: _navigateToHome,
+                        onPressed: _navigateToLogin,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFDB0C0C),
                           minimumSize: Size(double.infinity, 50.h),
@@ -274,8 +289,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
 
-            // 🔹 Tombol Lewati
-            if (_currentPage != onboardingData.length - 1)
+            // 🔹 Tombol Lewati (kalau belum di slide terakhir)
+            if (!_isLastPage)
               Positioned(
                 right: 20.w,
                 top: 10.h,
@@ -320,6 +335,7 @@ class BottomHalfCircleOrnament extends StatelessWidget {
 
 class _SunrisePainter extends CustomPainter {
   final double diameter;
+
   _SunrisePainter(this.diameter);
 
   @override
