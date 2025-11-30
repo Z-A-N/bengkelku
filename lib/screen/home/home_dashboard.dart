@@ -49,10 +49,10 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   // buka halaman detail bengkel (sementara tanpa kirim data)
-  void _openBengkelDetail() {
+  void _openBengkelDetail(Bengkel b) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const BengkelDetailPage()),
+      MaterialPageRoute(builder: (_) => BengkelDetailPage(bengkel: b)),
     );
   }
 
@@ -629,7 +629,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _openBengkelDetail, // nanti bisa kirim data b
+        onTap: () => _openBengkelDetail(b),
+        // nanti bisa kirim data b
         child: Container(
           height: 210.h,
           decoration: BoxDecoration(
@@ -700,7 +701,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _openBengkelDetail,
+        onTap: () => _openBengkelDetail(b),
         child: Container(
           height: 110.h,
           decoration: BoxDecoration(

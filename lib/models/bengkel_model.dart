@@ -8,6 +8,7 @@ class Bengkel {
   final double rating;
   final bool buka;
   final String foto;
+  final String telepon;
   final GeoPoint lokasi;
   final Map<String, dynamic> jamOperasional;
 
@@ -19,6 +20,7 @@ class Bengkel {
     required this.rating,
     required this.buka,
     required this.foto,
+    required this.telepon,
     required this.lokasi,
     required this.jamOperasional,
   });
@@ -34,9 +36,9 @@ class Bengkel {
       rating: (data['rating'] ?? 0).toDouble(),
       buka: data['buka'] ?? false,
       foto: data['foto'] ?? '',
+      telepon: data['telepon'],
       lokasi: data['lokasi'] as GeoPoint? ?? const GeoPoint(0, 0),
-      jamOperasional:
-          (data['jam_operasional'] as Map<String, dynamic>?) ?? {},
+      jamOperasional: (data['jam_operasional'] as Map<String, dynamic>?) ?? {},
     );
   }
 }

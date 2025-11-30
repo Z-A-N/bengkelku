@@ -2,9 +2,15 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import '../../models/bengkel_model.dart';
+import '../booking/booking_summary.dart'; // <- di sini ada class LayananItem
 
 class BengkelDetailPage extends StatelessWidget {
-  const BengkelDetailPage({super.key});
+  final Bengkel bengkel;
+
+  const BengkelDetailPage({super.key, required this.bengkel});
 
   @override
   Widget build(BuildContext context) {
@@ -12,12 +18,12 @@ class BengkelDetailPage extends StatelessWidget {
       length: 3,
       child: Scaffold(
         backgroundColor: Colors.white,
-        bottomNavigationBar: const _BottomActionBar(),
+        bottomNavigationBar: _BottomActionBar(bengkel: bengkel),
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
-              SliverToBoxAdapter(child: const _HeaderImage()),
-              SliverToBoxAdapter(child: const _BengkelSummary()),
+              const SliverToBoxAdapter(child: _HeaderImage()),
+              SliverToBoxAdapter(child: _BengkelSummary(bengkel: bengkel)),
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _SliverTabBarDelegate(
@@ -44,8 +50,12 @@ class BengkelDetailPage extends StatelessWidget {
               ),
             ];
           },
-          body: const TabBarView(
-            children: [_InfoTab(), _LayananTab(), _UlasanTab()],
+          body: TabBarView(
+            children: [
+              _InfoTab(bengkel: bengkel),
+              _LayananTab(bengkel: bengkel),
+              _UlasanTab(bengkelId: bengkel.id),
+            ],
           ),
         ),
       ),
@@ -67,15 +77,9 @@ class _HeaderImage extends StatelessWidget {
       width: double.infinity,
       child: Stack(
         children: [
-          // FOTO
           Positioned.fill(
-            child: Image.asset(
-              'assets/workshop_sample.jpg', // TODO: ganti image kamu
-              fit: BoxFit.cover,
-            ),
+            child: Image.asset('assets/workshop_sample.jpg', fit: BoxFit.cover),
           ),
-
-          // LAYER GRADIENT
           Positioned.fill(
             child: Align(
               alignment: Alignment.bottomCenter,
@@ -94,7 +98,6 @@ class _HeaderImage extends StatelessWidget {
               ),
             ),
           ),
-
           SafeArea(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -144,7 +147,9 @@ class _RoundIconButton extends StatelessWidget {
 ///////////////////////////////////////////////////////////////////////////
 
 class _BengkelSummary extends StatelessWidget {
-  const _BengkelSummary();
+  final Bengkel bengkel;
+
+  const _BengkelSummary({required this.bengkel});
 
   @override
   Widget build(BuildContext context) {
@@ -154,17 +159,16 @@ class _BengkelSummary extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Bengkel Terus Jaya",
+            bengkel.nama,
             style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w700),
           ),
           SizedBox(height: 8.h),
-
           Row(
             children: [
               const Icon(Icons.star_rounded, color: Colors.orange, size: 18),
               SizedBox(width: 4.w),
               Text(
-                "4.9",
+                bengkel.rating.toStringAsFixed(1),
                 style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
               ),
               SizedBox(width: 8.w),
@@ -182,13 +186,17 @@ class _BengkelSummary extends StatelessWidget {
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5E9),
+                  color: bengkel.buka
+                      ? const Color(0xFFE8F5E9)
+                      : const Color(0xFFFFEBEE),
                   borderRadius: BorderRadius.circular(16.r),
                 ),
                 child: Text(
-                  "Buka",
+                  bengkel.buka ? "Buka" : "Tutup",
                   style: TextStyle(
-                    color: const Color(0xFF2E7D32),
+                    color: bengkel.buka
+                        ? const Color(0xFF2E7D32)
+                        : const Color(0xFFB71C1C),
                     fontSize: 11.sp,
                     fontWeight: FontWeight.w600,
                   ),
@@ -196,10 +204,9 @@ class _BengkelSummary extends StatelessWidget {
               ),
             ],
           ),
-
           SizedBox(height: 6.h),
           Text(
-            "Tambal ban, service motor, ganti oli",
+            bengkel.deskripsi ?? "Tambal ban, service motor, ganti oli",
             style: TextStyle(fontSize: 12.sp, color: Colors.grey[700]),
           ),
         ],
@@ -213,7 +220,9 @@ class _BengkelSummary extends StatelessWidget {
 ///////////////////////////////////////////////////////////////////////////
 
 class _InfoTab extends StatelessWidget {
-  const _InfoTab();
+  final Bengkel bengkel;
+
+  const _InfoTab({required this.bengkel});
 
   @override
   Widget build(BuildContext context) {
@@ -226,21 +235,18 @@ class _InfoTab extends StatelessWidget {
             const Icon(Icons.place_outlined, size: 22),
             SizedBox(width: 8.w),
             Expanded(
-              child: Text(
-                "Jl. MT Haryono No 123, Karangsentul, Padamara, Purbalingga",
-                style: TextStyle(fontSize: 13.sp),
-              ),
+              child: Text(bengkel.alamat, style: TextStyle(fontSize: 13.sp)),
             ),
           ],
         ),
-
         SizedBox(height: 20.h),
-
         SizedBox(
           width: double.infinity,
           height: 44.h,
           child: OutlinedButton(
-            onPressed: () {},
+            onPressed: () {
+              // TODO: buka maps
+            },
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFFDB0C0C), width: 1.4),
               shape: RoundedRectangleBorder(
@@ -257,30 +263,26 @@ class _InfoTab extends StatelessWidget {
             ),
           ),
         ),
-
         SizedBox(height: 26.h),
         Text(
           "Jam Operasional",
           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700),
         ),
-
         SizedBox(height: 12.h),
-        _InfoDay(label: "Senin - Jumat", time: "08:00 - 16:00"),
-        _InfoDay(label: "Sabtu", time: "08:00 - 16:00"),
-        _InfoDay(label: "Minggu", time: "08:00 - 16:00"),
-
+        const _InfoDay(label: "Senin - Jumat", time: "08:00 - 16:00"),
+        const _InfoDay(label: "Sabtu", time: "08:00 - 16:00"),
+        const _InfoDay(label: "Minggu", time: "08:00 - 16:00"),
         SizedBox(height: 26.h),
         Text(
           "Kontak",
           style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w700),
         ),
         SizedBox(height: 12.h),
-
         Row(
           children: [
             const Icon(Icons.phone_outlined, size: 20),
             SizedBox(width: 8.w),
-            Text("+62 856-0177-8422", style: TextStyle(fontSize: 13.sp)),
+            Text(bengkel.telepon ?? "-", style: TextStyle(fontSize: 13.sp)),
             const Spacer(),
             Text(
               "Hubungi",
@@ -323,59 +325,115 @@ class _InfoDay extends StatelessWidget {
 }
 
 ///////////////////////////////////////////////////////////////////////////
-/// TAB LAYANAN
+/// TAB LAYANAN  (ambil dari subcollection Firestore)
 ///////////////////////////////////////////////////////////////////////////
 
-class _LayananTab extends StatelessWidget {
-  const _LayananTab();
+class _LayananTab extends StatefulWidget {
+  final Bengkel bengkel;
+
+  const _LayananTab({required this.bengkel});
+
+  @override
+  State<_LayananTab> createState() => _LayananTabState();
+}
+
+class _LayananTabState extends State<_LayananTab> {
+  /// layanan yang sudah pernah dipilih user (disimpan supaya tidak hilang)
+  List<LayananItem> _selected = [];
+
+  bool _isSelected(String id) {
+    return _selected.any((e) => e.id == id);
+  }
+
+  Future<void> _onPilihLayanan(QueryDocumentSnapshot doc) async {
+    final hargaNum = (doc['harga'] ?? 0) as num;
+
+    final item = LayananItem(
+      id: doc.id,
+      nama: doc['nama'] ?? '-',
+      harga: hargaNum.toInt(),
+    );
+
+    // kalau item belum ada di list, tambahkan
+    if (!_isSelected(item.id)) {
+      _selected = [..._selected, item];
+    }
+
+    // buka Ringkasan Booking dengan SEMUA layanan yang sudah dipilih
+    final result = await Navigator.push<List<LayananItem>>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BookingSummaryPage(
+          bengkel: widget.bengkel,
+          layananDipilih: List<LayananItem>.from(_selected),
+        ),
+      ),
+    );
+
+    // result = list terbaru dari BookingSummary (setelah user hapus di sana)
+    if (result != null) {
+      setState(() {
+        _selected = result;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
-      children: [
-        Text(
-          "Perawatan Motor",
-          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700),
-        ),
-        SizedBox(height: 10.h),
-        _ServiceItem(
-          title: "Tambal Ban",
-          subtitle: "Termasuk oli berkualitas dan filter oli",
-          price: "Rp. 15.000",
-          buttonText: "Pesan",
-        ),
-        SizedBox(height: 10.h),
-        _ServiceItem(
-          title: "Ganti Oli",
-          subtitle: "Oli pilihan untuk motor harian",
-          price: "Rp. 60.000",
-          buttonText: "Pesan",
-        ),
+    final layananRef = FirebaseFirestore.instance
+        .collection('bengkel')
+        .doc(widget.bengkel.id)
+        .collection('layanan')
+        .orderBy('harga', descending: false);
 
-        SizedBox(height: 26.h),
-        Text(
-          "Service Ringan",
-          style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700),
-        ),
+    return StreamBuilder<QuerySnapshot>(
+      stream: layananRef.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-        SizedBox(height: 10.h),
-        _ServiceItem(
-          filled: true,
-          title: "Servis Rutin",
-          subtitle: "Cek kondisi motor & tune up ringan",
-          price: "Rp. 120.000",
-          buttonText: "Tambah",
-        ),
-        SizedBox(height: 10.h),
-        _ServiceItem(
-          filled: true,
-          title: "Cek Rem & Kampas",
-          subtitle: "Pengecekan sistem pengereman",
-          price: "Rp. 45.000",
-          buttonText: "Tambah",
-        ),
-      ],
+        if (snapshot.hasError) {
+          return const Center(child: Text("Gagal memuat layanan"));
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        if (docs.isEmpty) {
+          return Center(
+            child: Text(
+              "Belum ada layanan terdaftar",
+              style: TextStyle(fontSize: 13.sp),
+            ),
+          );
+        }
+
+        return ListView(
+          padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
+          children: [
+            Text(
+              "Layanan Tersedia",
+              style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700),
+            ),
+            SizedBox(height: 10.h),
+
+            for (final doc in docs) ...[
+              _ServiceItem(
+                title: doc['nama'] ?? '-',
+                subtitle: doc['deskripsi'] ?? '',
+                price: (doc['harga'] ?? 0).toString(),
+                filled: true,
+                // kalau sudah pernah dipilih, teks bisa kamu ganti bebas
+                buttonText: _isSelected(doc.id)
+                    ? "Pesan (sudah dipilih)"
+                    : "Pesan",
+                onPressed: () => _onPilihLayanan(doc),
+              ),
+              SizedBox(height: 10.h),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -386,12 +444,14 @@ class _ServiceItem extends StatelessWidget {
   final String price;
   final String buttonText;
   final bool filled;
+  final VoidCallback onPressed;
 
   const _ServiceItem({
     required this.title,
     required this.subtitle,
     required this.price,
     required this.buttonText,
+    required this.onPressed,
     this.filled = false,
   });
 
@@ -412,7 +472,6 @@ class _ServiceItem extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // GAMBAR PRODUK
           ClipRRect(
             borderRadius: BorderRadius.circular(10.r),
             child: Image.asset(
@@ -422,9 +481,7 @@ class _ServiceItem extends StatelessWidget {
               fit: BoxFit.cover,
             ),
           ),
-
           SizedBox(width: 10.w),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -445,7 +502,7 @@ class _ServiceItem extends StatelessWidget {
                 ),
                 SizedBox(height: 6.h),
                 Text(
-                  price,
+                  "Rp $price",
                   style: TextStyle(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.w700,
@@ -455,15 +512,12 @@ class _ServiceItem extends StatelessWidget {
               ],
             ),
           ),
-
           SizedBox(width: 8.w),
-
-          // BUTTON PESAN / TAMBAH
           SizedBox(
             height: 34.h,
             child: filled
                 ? ElevatedButton(
-                    onPressed: () {},
+                    onPressed: onPressed,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFFFD740),
                       foregroundColor: Colors.black87,
@@ -480,7 +534,7 @@ class _ServiceItem extends StatelessWidget {
                     ),
                   )
                 : OutlinedButton(
-                    onPressed: () {},
+                    onPressed: onPressed,
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(
                         color: Color(0xFFDB0C0C),
@@ -511,43 +565,70 @@ class _ServiceItem extends StatelessWidget {
 ///////////////////////////////////////////////////////////////////////////
 
 class _UlasanTab extends StatelessWidget {
-  const _UlasanTab();
+  final String bengkelId;
+
+  const _UlasanTab({required this.bengkelId});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
-      children: [
-        const _RatingSummary(),
-        SizedBox(height: 20.h),
-        _ReviewCard(
-          name: "Courtney Henry",
-          rating: 5,
-          timeAgo: "2 mins ago",
-          text:
-              "Consequat velit qui adipisicing sint do reprehenderit ad laborum tempor ullamco exercitation.",
-        ),
-        const Divider(height: 30),
-        _ReviewCard(
-          name: "Courtney Henry",
-          rating: 4,
-          timeAgo: "10 mins ago",
-          text: "Ullamco tempor adipisicing et voluptate duis sit esse aliqua.",
-        ),
-        const Divider(height: 30),
-        _ReviewCard(
-          name: "Courtney Henry",
-          rating: 4,
-          timeAgo: "1 hour ago",
-          text: "Consequat velit qui adipisicing sint.",
-        ),
-      ],
+    final reviewRef = FirebaseFirestore.instance
+        .collection('bengkel')
+        .doc(bengkelId)
+        .collection('ulasan')
+        .orderBy('createdAt', descending: true);
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: reviewRef.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return const Center(child: Text("Gagal memuat ulasan"));
+        }
+
+        final docs = snapshot.data?.docs ?? [];
+
+        if (docs.isEmpty) {
+          return Center(
+            child: Text("Belum ada ulasan", style: TextStyle(fontSize: 13.sp)),
+          );
+        }
+
+        final ratings = docs
+            .map((d) => (d['rating'] ?? 0) as num)
+            .toList(growable: false);
+        final avgRating = ratings.isEmpty
+            ? 0.0
+            : ratings.reduce((a, b) => a + b) / ratings.length;
+
+        return ListView(
+          padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
+          children: [
+            _RatingSummary(average: avgRating, total: ratings.length),
+            SizedBox(height: 20.h),
+            for (final d in docs) ...[
+              _ReviewCard(
+                name: d['nama'] ?? 'Anonim',
+                rating: (d['rating'] ?? 0) as int,
+                timeAgo: "",
+                text: d['komentar'] ?? '',
+              ),
+              const Divider(height: 30),
+            ],
+          ],
+        );
+      },
     );
   }
 }
 
 class _RatingSummary extends StatelessWidget {
-  const _RatingSummary();
+  final double average;
+  final int total;
+
+  const _RatingSummary({required this.average, required this.total});
 
   @override
   Widget build(BuildContext context) {
@@ -595,7 +676,7 @@ class _RatingSummary extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                "4.0",
+                average.toStringAsFixed(1),
                 style: TextStyle(fontSize: 26.sp, fontWeight: FontWeight.w700),
               ),
               SizedBox(height: 6.h),
@@ -605,13 +686,15 @@ class _RatingSummary extends StatelessWidget {
                   (i) => Icon(
                     Icons.star_rounded,
                     size: 16,
-                    color: i < 4 ? Colors.orange : Colors.grey[300],
+                    color: i < average.round()
+                        ? Colors.orange
+                        : Colors.grey[300],
                   ),
                 ),
               ),
               SizedBox(height: 6.h),
               Text(
-                "52 Reviews",
+                "$total Reviews",
                 style: TextStyle(fontSize: 11.sp, color: Colors.grey[700]),
               ),
             ],
@@ -692,13 +775,14 @@ class _ReviewCard extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 6.w),
-                      Text(
-                        timeAgo,
-                        style: TextStyle(
-                          fontSize: 11.sp,
-                          color: Colors.grey[700],
+                      if (timeAgo.isNotEmpty)
+                        Text(
+                          timeAgo,
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.grey[700],
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ],
@@ -722,7 +806,9 @@ class _ReviewCard extends StatelessWidget {
 ///////////////////////////////////////////////////////////////////////////
 
 class _BottomActionBar extends StatelessWidget {
-  const _BottomActionBar();
+  final Bengkel bengkel;
+
+  const _BottomActionBar({required this.bengkel});
 
   @override
   Widget build(BuildContext context) {
@@ -747,7 +833,9 @@ class _BottomActionBar extends StatelessWidget {
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () {},
+              onPressed: () {
+                // TODO: arahkan ke chat bengkel
+              },
               style: OutlinedButton.styleFrom(
                 side: const BorderSide(color: Color(0xFFDB0C0C), width: 1.4),
                 shape: RoundedRectangleBorder(
@@ -776,12 +864,28 @@ class _BottomActionBar extends StatelessWidget {
               ),
             ),
           ),
-
           SizedBox(width: 10.w),
-
           Expanded(
             child: ElevatedButton(
-              onPressed: () {},
+              onPressed: () {
+                // fallback: user klik tombol bawah tanpa pilih layanan,
+                // kita kirim 1 layanan default
+                final defaultItem = LayananItem(
+                  id: 'default',
+                  nama: 'Servis Rutin',
+                  harga: 120000,
+                );
+
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BookingSummaryPage(
+                      bengkel: bengkel,
+                      layananDipilih: [defaultItem],
+                    ),
+                  ),
+                );
+              },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFD740),
                 foregroundColor: Colors.black87,
