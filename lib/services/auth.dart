@@ -4,13 +4,15 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 
 class AuthService {
-  AuthService._(); // private constructor
+  AuthService._();
   static final AuthService instance = AuthService._();
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // LOGIN email & password
+  // ===========================
+  // LOGIN EMAIL & PASSWORD
+  // ===========================
   Future<User?> login({required String email, required String password}) async {
     final cred = await _auth.signInWithEmailAndPassword(
       email: email,
@@ -19,7 +21,9 @@ class AuthService {
     return cred.user;
   }
 
+  // ===========================
   // REGISTER
+  // ===========================
   Future<User?> register({
     required String name,
     required String email,
@@ -37,12 +41,16 @@ class AuthService {
     return user;
   }
 
-  // KIRIM LINK RESET PASSWORD
+  // ===========================
+  // RESET PASSWORD
+  // ===========================
   Future<void> sendResetPasswordEmail(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
   }
 
-  // CEK APAKAH USER PUNYA DATA KENDARAAN
+  // ===========================
+  // CEK DATA KENDARAAN
+  // ===========================
   Future<bool> hasVehicleData(String uid) async {
     final doc = await _db
         .collection("users")
@@ -50,10 +58,13 @@ class AuthService {
         .collection("vehicle")
         .doc("main")
         .get();
+
     return doc.exists;
   }
 
+  // ===========================
   // SIMPAN DATA KENDARAAN
+  // ===========================
   Future<void> saveVehicleData({
     required String uid,
     required String jenis,
@@ -79,19 +90,14 @@ class AuthService {
         }, SetOptions(merge: true));
   }
 
-  // =========================
-  // GOOGLE SIGN IN
-  // =========================
+  // ===========================
+  // GOOGLE SIGN-IN
+  // ===========================
   Future<User?> signInWithGoogle() async {
-    // buka pop up / chooser akun Google
     final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
-    if (googleUser == null) {
-      // user cancel
-      return null;
-    }
+    if (googleUser == null) return null; // user cancel
 
-    final GoogleSignInAuthentication googleAuth =
-        await googleUser.authentication;
+    final googleAuth = await googleUser.authentication;
 
     final credential = GoogleAuthProvider.credential(
       idToken: googleAuth.idToken,
@@ -102,33 +108,37 @@ class AuthService {
     return userCred.user;
   }
 
-  // =========================
-  // FACEBOOK SIGN IN
-  // =========================
+  // ===========================
+  // FACEBOOK SIGN-IN
+  // ===========================
   Future<User?> signInWithFacebook() async {
-    // 1. login Facebook (muncul UI facebook)
     final LoginResult result = await FacebookAuth.instance.login();
 
+    // USER CANCEL LOGIN
+    if (result.status == LoginStatus.cancelled) {
+      return null;
+    }
+
+    // LOGIN GAGAL
     if (result.status != LoginStatus.success) {
-      // kalau user cancel / error
       throw FirebaseAuthException(
         code: 'facebook-login-failed',
-        message: result.message ?? 'Login Facebook dibatalkan atau gagal.',
+        message: 'Login Facebook gagal. Coba lagi.',
       );
     }
 
-    // 2. ambil access token
     final accessToken = result.accessToken;
+    if (accessToken == null) {
+      throw FirebaseAuthException(
+        code: 'facebook-no-token',
+        message: 'Gagal mendapatkan token Facebook. Coba lagi.',
+      );
+    }
 
-    // 3. buat credential
-    final facebookAuthCredential = FacebookAuthProvider.credential(
-      accessToken!.tokenString,
+    final userCred = await _auth.signInWithCredential(
+      FacebookAuthProvider.credential(accessToken.tokenString),
     );
 
-    // 4. login ke Firebase
-    final userCred = await FirebaseAuth.instance.signInWithCredential(
-      facebookAuthCredential,
-    );
     return userCred.user;
   }
 }

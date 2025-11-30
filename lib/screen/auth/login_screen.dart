@@ -205,27 +205,29 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
 
     try {
       final user = await AuthService.instance.signInWithGoogle();
-      if (user == null) return; // user cancel
+
+      // USER CANCEL LOGIN
+      if (user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
 
       await _handleAfterLogin(user);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
-      String msg = "Login Google gagal. Coba lagi.";
-      bool isError = false;
+      String msg = "Login Google gagal.";
+      bool isError = true;
 
       if (e.code == 'network-request-failed') {
         msg = "Koneksi internet bermasalah.";
-        isError = true;
       } else if (e.code == 'account-exists-with-different-credential') {
         msg =
             "Email ini sudah terdaftar dengan metode lain. Coba login dengan email & kata sandi.";
+        isError = false;
       }
 
       _showSnackBar(msg, isError: isError);
-    } catch (_) {
-      if (!mounted) return;
-      _showSnackBar('Koneksi internet bermasalah.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -240,26 +242,29 @@ class _MasukState extends State<Masuk> with SingleTickerProviderStateMixin {
 
     try {
       final user = await AuthService.instance.signInWithFacebook();
-      if (user == null) return;
+
+      // USER CANCEL LOGIN → smooth, tidak ada pesan
+      if (user == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
 
       await _handleAfterLogin(user);
     } on FirebaseAuthException catch (e) {
       if (!mounted) return;
 
-      String msg;
-      bool isError = false;
+      String msg = "Login Facebook gagal.";
+      bool isError = true;
 
       if (e.code == 'network-request-failed') {
         msg = "Koneksi internet bermasalah.";
-        isError = true;
-      } else {
-        msg = e.message ?? 'Login Facebook gagal';
+      } else if (e.code == 'facebook-no-token') {
+        msg = "Gagal mendapatkan token Facebook. Coba lagi.";
+      } else if (e.code == 'facebook-login-failed') {
+        msg = "Login Facebook gagal. Coba lagi.";
       }
 
       _showSnackBar(msg, isError: isError);
-    } catch (_) {
-      if (!mounted) return;
-      _showSnackBar('Koneksi internet bermasalah.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
