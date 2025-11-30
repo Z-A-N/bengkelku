@@ -20,6 +20,7 @@ dependencies:
   flutter_facebook_auth: ^7.0.0
   cloud_firestore: ^6.1.0
   shared_preferences: ^2.5.3
+  confetti: ^0.7.0
 
 dev_dependencies:
   flutter_test:

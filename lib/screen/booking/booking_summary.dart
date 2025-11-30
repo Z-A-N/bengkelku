@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../models/bengkel_model.dart';
+import 'booking_success.dart';
 
 /// 1 item layanan yang dipilih user
 class LayananItem {
@@ -83,13 +84,6 @@ class _BookingSummaryPageState extends State<BookingSummaryPage> {
   // =====================================================
 
   Future<void> _saveBooking() async {
-    if (_layananDipilih.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Pilih minimal 1 layanan dulu ya")),
-      );
-      return;
-    }
-
     if (_selectedJam == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Pilih jam kunjungan dulu ya")),
@@ -107,25 +101,15 @@ class _BookingSummaryPageState extends State<BookingSummaryPage> {
 
     setState(() => _isSaving = true);
 
-    // total dari semua layanan
-    final totalHarga = _layananDipilih.fold<int>(
-      0,
-      (sum, item) => sum + item.harga,
-    );
-
     try {
       await FirebaseFirestore.instance.collection('bookings').add({
         "userId": user.uid,
         "bengkelId": widget.bengkel.id,
         "bengkelNama": widget.bengkel.nama,
         "bengkelAlamat": widget.bengkel.alamat,
-
-        // simpan list layanan ke Firestore
         "layanan": _layananDipilih
             .map((e) => {"id": e.id, "nama": e.nama, "harga": e.harga})
             .toList(),
-        "totalHarga": totalHarga,
-
         "tanggal": Timestamp.fromDate(_selectedTanggal),
         "jam": _selectedJam,
         "jenisKendaraan": _jenisKendaraanC.text.trim(),
@@ -138,15 +122,38 @@ class _BookingSummaryPageState extends State<BookingSummaryPage> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(
+      // NAVIGASI KE HALAMAN BERHASIL (slide dari bawah)
+      Navigator.pushReplacement(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Booking berhasil dibuat")));
-      Navigator.pop(context);
+        PageRouteBuilder(
+          pageBuilder: (_, __, ___) => BookingSuccessPage(
+            bengkel: widget.bengkel,
+            layananDipilih: List<LayananItem>.from(_layananDipilih),
+            tanggal: _selectedTanggal,
+            jam: _selectedJam!,
+            jenisKendaraan: _jenisKendaraanC.text.trim(),
+            nomorPolisi: _nomorPolisiC.text.trim(),
+            catatan: _catatanC.text.trim(),
+            metodePembayaran: _metodePembayaran ?? "Bayar Ditempat",
+          ),
+          transitionsBuilder: (_, animation, __, child) {
+            final offsetAnim =
+                Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                );
+            return SlideTransition(position: offsetAnim, child: child);
+          },
+        ),
+      );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Gagal menyimpan booking: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text("Gagal menyimpan booking: $e")));
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
