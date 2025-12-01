@@ -139,25 +139,45 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
 
     setState(() => loading = true);
 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        // Sesi habis / user belum login
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Sesi kamu habis. Silakan login kembali."),
+          ),
+        );
+        Navigator.of(context).pop(); // balik ke sebelumnya (misal login)
+        return;
+      }
 
-    await AuthService.instance.saveVehicleData(
-      uid: uid,
-      jenis: jenisKendaraan,
-      nomorPolisi: nomorPolisi.text.trim(),
-      merek: merek,
-      model: model,
-      tahun: tahun,
-      km: kilometer.text.trim().isEmpty ? null : kilometer.text.trim(),
-    );
+      await AuthService.instance.saveVehicleData(
+        uid: user.uid,
+        jenis: jenisKendaraan,
+        nomorPolisi: nomorPolisi.text.trim(),
+        merek: merek,
+        model: model,
+        tahun: tahun,
+        km: kilometer.text.trim().isEmpty ? null : kilometer.text.trim(),
+      );
 
-    setState(() => loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Data kendaraan berhasil disimpan!")),
+      );
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Data kendaraan berhasil disimpan!")),
-    );
-
-    Navigator.pop(context);
+      Navigator.pop(context);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Gagal menyimpan data kendaraan. Coba lagi."),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
   }
 
   // TextField floating label

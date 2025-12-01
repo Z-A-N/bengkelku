@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: deprecated_member_use, unnecessary_underscores
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -15,11 +15,14 @@ class LupaKataSandi extends StatefulWidget {
 
 class _LupaKataSandiState extends State<LupaKataSandi>
     with SingleTickerProviderStateMixin {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _emailController = TextEditingController();
+
   late AnimationController _pengendaliAnimasi;
   late Animation<double> _animasiFade;
   late Animation<Offset> _animasiGeser;
 
-  final TextEditingController _emailController = TextEditingController();
+  String? _emailErrorText;
   bool _isLoading = false;
 
   @override
@@ -45,6 +48,13 @@ class _LupaKataSandiState extends State<LupaKataSandi>
         );
 
     _pengendaliAnimasi.forward();
+
+    // Reset error ketika user ngetik lagi
+    _emailController.addListener(() {
+      if (_emailErrorText != null) {
+        setState(() => _emailErrorText = null);
+      }
+    });
   }
 
   @override
@@ -54,90 +64,77 @@ class _LupaKataSandiState extends State<LupaKataSandi>
     super.dispose();
   }
 
-  /// Fungsi kirim link reset ke email Firebase
+  // ===============================================================
+  // SNACKBAR
+  // ===============================================================
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: isError
+              ? Colors.red.shade700
+              : const Color(0xFF27AE60),
+          content: Text(message),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+  }
+
+  // ===============================================================
+  // KIRIM RESET PASSWORD – MIRIP LOGIN, TANPA CEK PAKSA
+  // ===============================================================
   Future<void> _kirimLinkReset() async {
+    if (!_formKey.currentState!.validate()) return;
+
     final email = _emailController.text.trim();
 
-    if (email.isEmpty) {
-      _tampilkanDialog(
-        judul: "Email Kosong",
-        pesan: "Harap masukkan alamat email kamu terlebih dahulu.",
-        ikon: Icons.warning_amber_rounded,
-        warna: Colors.orange,
-      );
-      return;
-    }
-
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _emailErrorText = null;
+    });
 
     try {
-     await AuthService.instance.sendResetPasswordEmail(email);
-      _tampilkanDialog(
-        judul: "Berhasil!",
-        pesan:
-            "Tautan reset kata sandi telah dikirim ke:\n$email\n\nCek kotak masuk atau folder spam kamu.",
-        ikon: Icons.email_outlined,
-        warna: Colors.green,
+      await AuthService.instance.sendResetPasswordEmail(email);
+
+      // Firebase secara security TIDAK kasih tahu apakah email terdaftar atau tidak.
+      // Jadi selalu kasih pesan general:
+      _showSnackBar(
+        "Jika email terdaftar, tautan reset kata sandi telah dikirim.",
+        isError: false,
       );
     } on FirebaseAuthException catch (e) {
-      String pesan = "Terjadi kesalahan. Coba lagi nanti.";
-      IconData ikon = Icons.error_outline;
-      Color warna = Colors.redAccent;
-
       switch (e.code) {
         case "invalid-email":
-          pesan = "Format email tidak valid. Pastikan alamat email benar.";
+          setState(() => _emailErrorText = "Format email salah");
           break;
-        case "user-not-found":
-          pesan =
-              "Email ini tidak terdaftar. Silakan periksa kembali atau daftar akun baru.";
-          break;
-        case "network-request-failed":
-          pesan = "Koneksi internet bermasalah. Coba lagi.";
-          break;
-      }
 
-      _tampilkanDialog(judul: "Gagal", pesan: pesan, ikon: ikon, warna: warna);
+        case "network-request-failed":
+          _showSnackBar("Koneksi internet bermasalah.", isError: true);
+          break;
+
+        // Beberapa versi lama masih bisa kirim user-not-found,
+        // kalau mau, bisa juga kamu munculkan error di bawah field:
+        case "user-not-found":
+          setState(() => _emailErrorText = "Email tidak terdaftar");
+          break;
+
+        default:
+          _showSnackBar("Terjadi kesalahan. Coba lagi.", isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _tampilkanDialog({
-    required String judul,
-    required String pesan,
-    required IconData ikon,
-    required Color warna,
-  }) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(ikon, color: warna, size: 26),
-            const SizedBox(width: 10),
-            Text(
-              judul,
-              style: TextStyle(
-                color: warna,
-                fontWeight: FontWeight.bold,
-                fontSize: 18.sp,
-              ),
-            ),
-          ],
-        ),
-        content: Text(pesan, style: TextStyle(fontSize: 14.sp, height: 1.4)),
-        actions: [
-          TextButton(
-            child: const Text("OK"),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
-
+  // ===============================================================
+  // UI
+  // ===============================================================
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,6 +143,7 @@ class _LupaKataSandiState extends State<LupaKataSandi>
         child: Stack(
           children: [
             const OrnamenSetengahLingkaranAtas(),
+
             Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: 500.w),
@@ -154,224 +152,178 @@ class _LupaKataSandiState extends State<LupaKataSandi>
                     horizontal: 28.w,
                     vertical: 25.h,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      SizedBox(height: 0.06.sh),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(height: 0.05.sh),
 
-                      // 🌅 Logo
-                      FadeTransition(
-                        opacity: _animasiFade,
-                        child: SlideTransition(
-                          position: _animasiGeser,
-                          child: Image.asset(
-                            'assets/logo.png',
-                            width: 100.w,
-                            height: 100.w,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                      ),
-
-                      SizedBox(height: 25.h),
-
-                      // 📝 Judul
-                      FadeTransition(
-                        opacity: _animasiFade,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                TextSpan(
-                                  text: "Lupa\n",
-                                  style: TextStyle(
-                                    fontSize: 26.sp,
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.black87,
-                                  ),
-                                ),
-                                TextSpan(
-                                  text: "Kata Sandi?",
-                                  style: TextStyle(
-                                    fontSize: 26.sp,
-                                    fontWeight: FontWeight.w800,
-                                    color: const Color(0xFFDB0C0C),
-                                  ),
-                                ),
-                              ],
+                        // LOGO
+                        FadeTransition(
+                          opacity: _animasiFade,
+                          child: SlideTransition(
+                            position: _animasiGeser,
+                            child: Image.asset(
+                              'assets/logo.png',
+                              width: 90.w,
+                              height: 90.w,
                             ),
                           ),
                         ),
-                      ),
 
-                      SizedBox(height: 10.h),
+                        SizedBox(height: 25.h),
 
-                      const DeskripsiAnimasi(),
-
-                      SizedBox(height: 30.h),
-
-                      // ✉️ Input Email
-                      FadeTransition(
-                        opacity: _animasiFade,
-                        child: SlideTransition(
-                          position: _animasiGeser,
-                          child: TextField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: InputDecoration(
-                              labelText: "Email",
-                              hintText: "contoh@gmail.com",
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12.r),
+                        // JUDUL (mirip login)
+                        FadeTransition(
+                          opacity: _animasiFade,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: "Reset\n",
+                                    style: TextStyle(
+                                      fontSize: 26.sp,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: "Kata Sandi",
+                                    style: TextStyle(
+                                      fontSize: 26.sp,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFFDB0C0C),
+                                    ),
+                                  ),
+                                ],
                               ),
-                              prefixIcon: const Icon(Icons.email_outlined),
                             ),
                           ),
                         ),
-                      ),
 
-                      SizedBox(height: 25.h),
+                        SizedBox(height: 8.h),
 
-                      // 🔴 Tombol Kirim Link Reset
-                      FadeTransition(
-                        opacity: _animasiFade,
-                        child: SlideTransition(
-                          position: _animasiGeser,
-                          child: SizedBox(
-                            width: double.infinity,
-                            height: 48.h,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _kirimLinkReset,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFDB0C0C),
-                                shape: RoundedRectangleBorder(
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            "Masukkan email kamu untuk menerima tautan reset kata sandi.",
+                            style: TextStyle(
+                              color: Colors.black54,
+                              fontSize: 15.sp,
+                            ),
+                          ),
+                        ),
+
+                        SizedBox(height: 25.h),
+
+                        // INPUT EMAIL
+                        FadeTransition(
+                          opacity: _animasiFade,
+                          child: SlideTransition(
+                            position: _animasiGeser,
+                            child: TextFormField(
+                              controller: _emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              validator: (v) {
+                                if (v == null || v.trim().isEmpty) {
+                                  return "Email wajib diisi";
+                                }
+                                final regex = RegExp(r'^[^@]+@[^@]+\.[^@]+$');
+                                if (!regex.hasMatch(v.trim())) {
+                                  return "Format email tidak valid";
+                                }
+                                return null;
+                              },
+                              decoration: InputDecoration(
+                                labelText: "Email",
+                                hintText: "contoh@gmail.com",
+                                border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(12.r),
                                 ),
-                                elevation: 2,
+                                prefixIcon: const Icon(Icons.email_outlined),
+                                errorText: _emailErrorText,
                               ),
-                              child: _isLoading
-                                  ? const CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2,
-                                    )
-                                  : Text(
-                                      "Kirim Tautan Reset",
-                                      style: TextStyle(
-                                        fontSize: 16.sp,
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.white,
-                                      ),
-                                    ),
                             ),
                           ),
                         ),
-                      ),
 
-                      SizedBox(height: 25.h),
+                        SizedBox(height: 25.h),
 
-                      // 🔙 Kembali ke Login
-                      FadeTransition(
-                        opacity: _animasiFade,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Ingat kata sandimu? ",
-                              style: TextStyle(
-                                fontSize: 14.sp,
-                                color: Colors.black87,
+                        // TOMBOL KIRIM RESET (mirip tombol login)
+                        FadeTransition(
+                          opacity: _animasiFade,
+                          child: SlideTransition(
+                            position: _animasiGeser,
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 48.h,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _kirimLinkReset,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFDB0C0C),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12.r),
+                                  ),
+                                ),
+                                child: _isLoading
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2,
+                                      )
+                                    : Text(
+                                        "Kirim Tautan Reset",
+                                        style: TextStyle(
+                                          fontSize: 16.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
                               ),
                             ),
-                            GestureDetector(
-                              onTap: () => Navigator.pop(context),
-                              child: Text(
-                                "Masuk Sekarang",
+                          ),
+                        ),
+
+                        SizedBox(height: 20.h),
+
+                        // KEMBALI KE LOGIN (mirip login footer)
+                        FadeTransition(
+                          opacity: _animasiFade,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Ingat kata sandimu? ",
                                 style: TextStyle(
-                                  color: const Color(0xFFDB0C0C),
-                                  fontWeight: FontWeight.bold,
                                   fontSize: 14.sp,
+                                  color: Colors.black87,
                                 ),
                               ),
-                            ),
-                          ],
+                              GestureDetector(
+                                onTap: () => Navigator.pop(context),
+                                child: Text(
+                                  "Masuk Sekarang",
+                                  style: TextStyle(
+                                    color: const Color(0xFFDB0C0C),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-
-//
-// 💬 Deskripsi Animasi (efek mengetik)
-//
-class DeskripsiAnimasi extends StatefulWidget {
-  const DeskripsiAnimasi({super.key});
-
-  @override
-  State<DeskripsiAnimasi> createState() => _DeskripsiAnimasiState();
-}
-
-class _DeskripsiAnimasiState extends State<DeskripsiAnimasi> {
-  final String _text =
-      "Masukkan email kamu untuk mendapatkan tautan reset kata sandi.";
-  String _displayedText = "";
-  double _opacity = 0;
-  Offset _offset = const Offset(0, 0.05);
-
-  @override
-  void initState() {
-    super.initState();
-
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
-      setState(() {
-        _opacity = 1;
-        _offset = Offset.zero;
-      });
-      _typeWriterEffect();
-    });
-  }
-
-  void _typeWriterEffect() async {
-    for (int i = 0; i < _text.length; i++) {
-      await Future.delayed(const Duration(milliseconds: 25));
-      if (!mounted) return;
-      setState(() {
-        _displayedText = _text.substring(0, i + 1);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: _opacity,
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeInOut,
-      child: AnimatedSlide(
-        offset: _offset,
-        duration: const Duration(milliseconds: 800),
-        curve: Curves.easeOutCubic,
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Text(
-            _displayedText,
-            style: TextStyle(
-              color: Colors.black54,
-              fontSize: 15.sp,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
-            ),
-          ),
         ),
       ),
     );
