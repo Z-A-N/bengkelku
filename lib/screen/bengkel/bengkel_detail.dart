@@ -610,7 +610,7 @@ class _UlasanTab extends StatelessWidget {
             SizedBox(height: 20.h),
             for (final d in docs) ...[
               _ReviewCard(
-                name: d['nama'] ?? 'Anonim',
+                name: d['namaUser'] ?? 'Anonim',
                 rating: (d['rating'] ?? 0) as int,
                 timeAgo: "",
                 text: d['komentar'] ?? '',
@@ -865,25 +865,88 @@ class _BottomActionBar extends StatelessWidget {
             ),
           ),
           SizedBox(width: 10.w),
+
+          // === TOMBOL BOOKING SEKARANG ===
           Expanded(
             child: ElevatedButton(
               onPressed: () {
-                // fallback: user klik tombol bawah tanpa pilih layanan,
-                // kita kirim 1 layanan default
-                final defaultItem = LayananItem(
-                  id: 'default',
-                  nama: 'Servis Rutin',
-                  harga: 120000,
-                );
+                showDialog(
+                  context: context,
+                  barrierDismissible: true, // bisa tutup tap di luar
+                  builder: (ctx) {
+                    return Dialog(
+                      backgroundColor:
+                          Colors.transparent, // biar bisa kasih shadow custom
+                      insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(28.r),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.18),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // judul
+                            Text(
+                              "Pilih layanan dulu",
+                              style: TextStyle(
+                                fontSize: 18.sp,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            SizedBox(height: 12.h),
 
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => BookingSummaryPage(
-                      bengkel: bengkel,
-                      layananDipilih: [defaultItem],
-                    ),
-                  ),
+                            // deskripsi
+                            Text(
+                              "Silakan pilih minimal satu"
+                              "layanan sebelum melakukan booking.",
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                color: Colors.grey[700],
+                                height: 1.4,
+                              ),
+                            ),
+
+                            SizedBox(height: 24.h),
+
+                            // tombol kuning lebar
+                            SizedBox(
+                              width: double.infinity,
+                              height: 44.h,
+                              child: ElevatedButton(
+                                onPressed: () => Navigator.pop(ctx),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFDB0C0C),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20.r),
+                                  ),
+                                ),
+                                child: Text(
+                                  "OK",
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
               style: ElevatedButton.styleFrom(

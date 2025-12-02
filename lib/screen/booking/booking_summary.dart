@@ -84,6 +84,14 @@ class _BookingSummaryPageState extends State<BookingSummaryPage> {
   // =====================================================
 
   Future<void> _saveBooking() async {
+    // kalau tidak ada layanan sama sekali
+    if (_layananDipilih.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Pilih minimal satu layanan dulu ya")),
+      );
+      return;
+    }
+
     if (_selectedJam == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Pilih jam kunjungan dulu ya")),
@@ -642,6 +650,7 @@ class _BookingSummaryPageState extends State<BookingSummaryPage> {
   }
 
   // ---------------- INFORMASI KENDARAAN ----------------
+  //   -> TextField seperti form login (label di atas, outline rounded)
 
   Widget _buildInformasiKendaraanSection() {
     return Column(
@@ -657,13 +666,13 @@ class _BookingSummaryPageState extends State<BookingSummaryPage> {
           hint: "Honda Beat",
           controller: _jenisKendaraanC,
         ),
-        SizedBox(height: 8.h),
+        SizedBox(height: 10.h),
         _buildTextField(
           label: "Nomor polisi (opsional)",
           hint: "R 1234 XX",
           controller: _nomorPolisiC,
         ),
-        SizedBox(height: 8.h),
+        SizedBox(height: 10.h),
         _buildTextField(
           label: "Catatan (opsional)",
           hint: "Mesin agak kasar",
@@ -674,51 +683,44 @@ class _BookingSummaryPageState extends State<BookingSummaryPage> {
     );
   }
 
+  /// TextField style: outline putih, label di atas border (mirip login screen)
   Widget _buildTextField({
     required String label,
     required String hint,
     required TextEditingController controller,
     int maxLines = 1,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(fontSize: 12.sp, color: Colors.grey[800]),
+    const borderRadius = 14.0;
+
+    OutlineInputBorder _border(Color color) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(borderRadius),
+      borderSide: BorderSide(color: color, width: 1.4),
+    );
+
+    return TextField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: TextStyle(
+          fontSize: 12.sp,
+          color: const Color.fromARGB(255, 2, 0, 0), // ungu soft seperti contoh
         ),
-        SizedBox(height: 4.h),
-        TextField(
-          controller: controller,
-          maxLines: maxLines,
-          decoration: InputDecoration(
-            hintText: hint,
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 12.w,
-              vertical: 10.h,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.r),
-              borderSide: const BorderSide(color: Color(0xFFFFD740)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.r),
-              borderSide: const BorderSide(color: Color(0xFFFFD740)),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(10.r),
-              borderSide: const BorderSide(
-                color: Color(0xFFDB0C0C),
-                width: 1.4,
-              ),
-            ),
-          ),
-        ),
-      ],
+        hintStyle: TextStyle(fontSize: 13.sp, color: Colors.grey[500]),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+        enabledBorder: _border(Colors.grey.shade300),
+        focusedBorder: _border(const Color(0xFF7E57C2)),
+        border: _border(Colors.grey.shade300),
+      ),
+      style: TextStyle(fontSize: 13.sp),
     );
   }
 
   // ---------------- METODE PEMBAYARAN ----------------
+  //   -> tampilan kartu seperti item di "Layanan Dipilih"
 
   Widget _buildMetodePembayaranSection() {
     final methods = ["Bayar Ditempat", "Transfer Bank", "E-Wallet"];
@@ -734,47 +736,45 @@ class _BookingSummaryPageState extends State<BookingSummaryPage> {
         Column(
           children: methods.map((m) {
             final selected = _metodePembayaran == m;
-            return Container(
-              margin: EdgeInsets.only(bottom: 8.h),
-              child: InkWell(
-                onTap: () {
-                  setState(() => _metodePembayaran = m);
-                },
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12.w,
-                    vertical: 12.h,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12.r),
-                    border: Border.all(
-                      color: const Color(0xFFFFD740),
-                      width: selected ? 1.6 : 1.0,
+
+            return GestureDetector(
+              onTap: () => setState(() => _metodePembayaran = m),
+              child: Container(
+                margin: EdgeInsets.only(bottom: 8.h),
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.03),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
                     ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.home_outlined, size: 18),
-                      SizedBox(width: 8.w),
-                      Text(
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.home_outlined, size: 20),
+                    SizedBox(width: 10.w),
+                    Expanded(
+                      child: Text(
                         m,
                         style: TextStyle(
                           fontSize: 13.sp,
                           fontWeight: selected
-                              ? FontWeight.w600
+                              ? FontWeight.w700
                               : FontWeight.w500,
                         ),
                       ),
-                      const Spacer(),
-                      if (selected)
-                        const Icon(
-                          Icons.check_circle,
-                          color: Color(0xFFDB0C0C),
-                          size: 20,
-                        ),
-                    ],
-                  ),
+                    ),
+                    if (selected)
+                      const Icon(
+                        Icons.check_circle,
+                        color: Color(0xFFDB0C0C),
+                        size: 20,
+                      ),
+                  ],
                 ),
               ),
             );

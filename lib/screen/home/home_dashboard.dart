@@ -11,6 +11,7 @@ import '../profile/profile.dart';
 import '../../widgets/navbar.dart';
 import '../chat/chat.dart';
 import '../riwayat/riwayat.dart';
+import '../auth/login_screen.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
@@ -48,7 +49,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
         .map((snap) => snap.docs.map((d) => Bengkel.fromDoc(d)).toList());
   }
 
-  // buka halaman detail bengkel (sementara tanpa kirim data)
+  // buka halaman detail bengkel
   void _openBengkelDetail(Bengkel b) {
     Navigator.push(
       context,
@@ -75,6 +76,112 @@ class _HomeDashboardState extends State<HomeDashboard> {
         currentIndex: _selectedIndex,
         onTap: (i) => setState(() => _selectedIndex = i),
       ),
+    );
+  }
+
+  // =====================================================
+  //             DIALOG LOGOUT CUSTOM (KAYA GAMBAR)
+  // =====================================================
+
+  Future<bool?> _showLogoutDialog() {
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              width: 0.85.sw,
+              padding: EdgeInsets.all(24.w),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.18),
+                    blurRadius: 25,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Title
+                  Text(
+                    "Keluar akun?",
+                    style: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black,
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+
+                  // Description
+                  Text(
+                    "Apakah kamu yakin ingin logout dari akun ini?",
+                    style: TextStyle(
+                      fontSize: 13.sp,
+                      color: Colors.black.withOpacity(0.7),
+                      height: 1.4,
+                    ),
+                  ),
+
+                  SizedBox(height: 24.h),
+
+                  // Yellow button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46.h,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(ctx, true);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFDB0C0C),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20.r),
+                        ),
+                      ),
+                      child: Text(
+                        "Keluar",
+                        style: TextStyle(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 10.h),
+
+                  // Cancel text button (abu-abu)
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.pop(ctx, false);
+                      },
+                      child: Text(
+                        "Batal",
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -189,8 +296,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         return const Text("Belum ada bengkel terdaftar");
                       }
 
-                      // Layout sama seperti desain:
-                      // 2 kartu kecil di atas, sisanya list besar di bawah
+                      // Layout: 2 kartu kecil di atas, sisanya list besar di bawah
                       return Column(
                         children: [
                           // ROW 2 KARTU KECIL
@@ -236,13 +342,12 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
   Widget _buildYellowHeader() {
     return Container(
-      height: 210.h, // tinggi kuning tetap
+      height: 210.h,
       width: double.infinity,
       decoration: const BoxDecoration(
         color: Color(0xFFFFD740),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
       ),
-      // geser isi header naik sedikit
       child: Transform.translate(
         offset: Offset(0, -73.h),
         child: Padding(
@@ -604,7 +709,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10.r),
                   child: LinearProgressIndicator(
-                    value: 0.6, // progress contoh
+                    value: 0.6,
                     minHeight: 6.h,
                     backgroundColor: Colors.grey.shade200,
                     valueColor: const AlwaysStoppedAnimation(Color(0xFFDB0C0C)),
@@ -630,7 +735,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
       color: Colors.transparent,
       child: InkWell(
         onTap: () => _openBengkelDetail(b),
-        // nanti bisa kirim data b
         child: Container(
           height: 210.h,
           decoration: BoxDecoration(
@@ -654,7 +758,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "5.8 km", // sementara statis, nanti bisa dihitung dari lokasi
+                      "5.8 km",
                       style: TextStyle(fontSize: 11.sp, color: Colors.grey),
                     ),
                     SizedBox(height: 2.h),
@@ -696,7 +800,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   /// Kartu besar list di bagian bawah
-  /// Kartu besar list di bagian bawah
   Widget _buildBengkelListCard(Bengkel b) {
     return Material(
       color: Colors.transparent,
@@ -725,14 +828,11 @@ class _HomeDashboardState extends State<HomeDashboard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // jarak (sementara statis)
                       Text(
                         "5.8 km",
                         style: TextStyle(fontSize: 11.sp, color: Colors.grey),
                       ),
                       SizedBox(height: 2.h),
-
-                      // nama
                       Text(
                         b.nama,
                         maxLines: 2,
@@ -743,8 +843,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         ),
                       ),
                       SizedBox(height: 4.h),
-
-                      // rating
                       Row(
                         children: [
                           const Icon(
@@ -763,8 +861,6 @@ class _HomeDashboardState extends State<HomeDashboard> {
                         ],
                       ),
                       SizedBox(height: 6.h),
-
-                      // deskripsi + badge BUKA/TUTUP
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -787,8 +883,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                             ),
                             decoration: BoxDecoration(
                               color: b.buka
-                                  ? const Color(0xFFE8F5E9) // hijau soft
-                                  : const Color(0xFFFFEBEE), // merah soft
+                                  ? const Color(0xFFE8F5E9)
+                                  : const Color(0xFFFFEBEE),
                               borderRadius: BorderRadius.circular(12.r),
                             ),
                             child: Text(
@@ -797,8 +893,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
                                 fontSize: 11.sp,
                                 fontWeight: FontWeight.w600,
                                 color: b.buka
-                                    ? const Color(0xFF2E7D32) // hijau tua
-                                    : const Color(0xFFB71C1C), // merah tua
+                                    ? const Color(0xFF2E7D32)
+                                    : const Color(0xFFB71C1C),
                               ),
                             ),
                           ),
@@ -841,8 +937,19 @@ class _HomeDashboardState extends State<HomeDashboard> {
       name: _displayName,
       email: _user?.email ?? "-",
       phone: null, // nanti bisa diisi dari Firestore
-      onLogout: () {
-        // TODO: isi signOut kalau mau
+      onLogout: () async {
+        final confirm = await _showLogoutDialog();
+        if (confirm != true) return;
+
+        await FirebaseAuth.instance.signOut();
+
+        if (!mounted) return;
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const Masuk()),
+          (route) => false,
+        );
       },
     );
   }
