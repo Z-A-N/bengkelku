@@ -1,13 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'forgot_password_screen.dart';
+import 'reset_password_screen.dart';
 import 'register_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../home/home_dashboard.dart';
+import '../../home/home_dashboard.dart';
 import 'vehicle_form_screen.dart';
-import 'package:bengkelku/services/auth.dart';
+import 'package:bengkelku/features/auth/services/auth_service.dart';
 import 'package:bengkelku/widgets/ornamen_Lingkaran.dart';
 
 class Masuk extends StatefulWidget {

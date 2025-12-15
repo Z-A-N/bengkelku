@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
-import 'package:bengkelku/services/auth.dart';
+import 'package:bengkelku/features/auth/services/auth_service.dart';
 import 'package:bengkelku/widgets/ornamen_Lingkaran.dart';
 
 class Daftar extends StatefulWidget {

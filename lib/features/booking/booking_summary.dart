@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable, unnecessary_underscores, avoid_types_as_parameter_names, deprecated_member_use, unnecessary_to_list_in_spreads, no_leading_underscores_for_local_identifiers
+
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';

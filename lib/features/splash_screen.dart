@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'onboarding_screen.dart';
+import 'auth/screen/vehicle_form_screen.dart';
+import 'home/home_dashboard.dart';
+import 'auth/services/auth_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -36,14 +39,32 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // Navigasi ke onboarding setelah 3 detik
-    Future.delayed(const Duration(seconds: 3), () {
+    // Setelah 3 detik, tentukan harus ke mana
+    Future.delayed(const Duration(seconds: 3), () async {
       if (!mounted) return;
+
+      final dest = await AuthService.instance.resolveStartDestination();
+
+      if (!mounted) return;
+
+      Widget page;
+      switch (dest) {
+        case AuthStartDestination.onboarding:
+          page = const OnboardingScreen();
+          break;
+        case AuthStartDestination.vehicleForm:
+          page = const VehicleFormScreen();
+          break;
+        case AuthStartDestination.home:
+          page = const HomeDashboard();
+          break;
+      }
+
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 800),
-          pageBuilder: (_, __, ___) => const OnboardingScreen(),
+          pageBuilder: (_, __, ___) => page,
           transitionsBuilder: (_, animation, __, child) {
             return FadeTransition(
               opacity: CurvedAnimation(

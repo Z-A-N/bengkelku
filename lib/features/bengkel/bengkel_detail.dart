@@ -1,4 +1,4 @@
-// ignore_for_file: deprecated_member_use
+// ignore_for_file: deprecated_member_use, dead_code
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -206,7 +206,7 @@ class _BengkelSummary extends StatelessWidget {
           ),
           SizedBox(height: 6.h),
           Text(
-            bengkel.deskripsi ?? "Tambal ban, service motor, ganti oli",
+            bengkel.deskripsi,
             style: TextStyle(fontSize: 12.sp, color: Colors.grey[700]),
           ),
         ],
@@ -282,7 +282,7 @@ class _InfoTab extends StatelessWidget {
           children: [
             const Icon(Icons.phone_outlined, size: 20),
             SizedBox(width: 8.w),
-            Text(bengkel.telepon ?? "-", style: TextStyle(fontSize: 13.sp)),
+            Text(bengkel.telepon, style: TextStyle(fontSize: 13.sp)),
             const Spacer(),
             Text(
               "Hubungi",

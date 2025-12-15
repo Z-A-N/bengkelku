@@ -1,30 +1,110 @@
-// ignore_for_file: use_build_context_synchronously, deprecated_member_use, curly_braces_in_flow_control_structures
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:bengkelku/widgets/ornamen_Lingkaran.dart';
-import 'package:bengkelku/services/auth.dart';
+import 'package:bengkelku/features/auth/services/auth_service.dart';
+import '../../home/home_dashboard.dart';
 
-// ---------------------------------------------------------
-// Uppercase formatter untuk plat nomor
-// ---------------------------------------------------------
+// =======================================================
+// Uppercase formatter untuk Nomor Polisi
+// =======================================================
 class UpperCaseTextFormatter extends TextInputFormatter {
   const UpperCaseTextFormatter();
+
   @override
-  TextEditingValue formatEditUpdate(_, newValue) {
-    return newValue.copyWith(text: newValue.text.toUpperCase());
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // 1. Uppercase & buang semua spasi
+    String raw = newValue.text.toUpperCase().replaceAll(RegExp(r'\s+'), '');
+
+    // Kosong? langsung balik aja
+    if (raw.isEmpty) {
+      return const TextEditingValue(
+        text: '',
+        selection: TextSelection.collapsed(offset: 0),
+      );
+    }
+
+    // 2. Pisahin jadi: huruf depan, angka, huruf belakang
+    String lettersPrefix = '';
+    String numbers = '';
+    String lettersSuffix = '';
+
+    int stage = 0; // 0 = prefix huruf, 1 = angka, 2 = suffix huruf
+
+    for (int i = 0; i < raw.length; i++) {
+      final c = raw[i];
+
+      final isLetter = RegExp(r'[A-Z]').hasMatch(c);
+      final isDigit = RegExp(r'[0-9]').hasMatch(c);
+
+      if (stage == 0) {
+        if (isLetter) {
+          lettersPrefix += c;
+        } else if (isDigit) {
+          stage = 1;
+          numbers += c;
+        }
+      } else if (stage == 1) {
+        if (isDigit) {
+          numbers += c;
+        } else if (isLetter) {
+          stage = 2;
+          lettersSuffix += c;
+        }
+      } else {
+        // stage == 2
+        if (isLetter) {
+          lettersSuffix += c;
+        }
+      }
+    }
+
+    // 3. Batasi sesuai format plat Indonesia
+    if (lettersPrefix.length > 2) {
+      lettersPrefix = lettersPrefix.substring(0, 2);
+    }
+    if (numbers.length > 4) {
+      numbers = numbers.substring(0, 4);
+    }
+    if (lettersSuffix.length > 3) {
+      lettersSuffix = lettersSuffix.substring(0, 3);
+    }
+
+    // 4. Susun ulang dengan spasi otomatis
+    String formatted = lettersPrefix;
+
+    if (numbers.isNotEmpty) {
+      if (formatted.isNotEmpty) formatted += ' ';
+      formatted += numbers;
+    }
+
+    if (lettersSuffix.isNotEmpty) {
+      if (formatted.isNotEmpty) formatted += ' ';
+      formatted += lettersSuffix;
+    }
+
+    // 5. Cursor selalu di akhir teks (biar simpel)
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
   }
 }
 
-// ---------------------------------------------------------
-// Slim Dropdown — Floating Label Version
-// ---------------------------------------------------------
+// =======================================================
+// Dropdown Kurus Elegan (Floating Label)
+// =======================================================
 class SlimDropdown extends StatelessWidget {
   final String label;
   final String? value;
   final List<String> items;
-  final IconData? icon; // boleh null (tanpa ikon)
+  final IconData? icon;
   final Function(String?) onChanged;
   final String? Function(String?)? validator;
 
@@ -44,12 +124,12 @@ class SlimDropdown extends StatelessWidget {
       value: value,
       validator: validator,
       decoration: InputDecoration(
-        labelText: label, // ← FLOATING LABEL
+        labelText: label,
         prefixIcon: icon == null ? null : Icon(icon),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12.r),
-          borderSide: const BorderSide(color: Color(0xFFDB0C0C), width: 1.4),
+          borderSide: const BorderSide(color: Color(0xFFDB0C0C), width: 1.5),
         ),
       ),
       icon: const Icon(Icons.keyboard_arrow_down_rounded),
@@ -61,11 +141,12 @@ class SlimDropdown extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------
+// =======================================================
 // MAIN SCREEN
-// ---------------------------------------------------------
+// =======================================================
 class VehicleFormScreen extends StatefulWidget {
   const VehicleFormScreen({super.key});
+
   @override
   State<VehicleFormScreen> createState() => _VehicleFormScreenState();
 }
@@ -100,7 +181,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
     "Honda": ["Brio", "HR-V", "Jazz", "Civic"],
   };
 
-  // Ikon dinamis hanya untuk jenis kendaraan
+  // Ikon dinamis
   IconData getVehicleIcon() {
     return jenisKendaraan == "Motor"
         ? Icons.motorcycle_rounded
@@ -113,12 +194,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
 
     anim = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 650),
     );
 
     fade = CurvedAnimation(parent: anim, curve: Curves.easeInOut);
     slide = Tween<Offset>(
-      begin: const Offset(0, 0.2),
+      begin: const Offset(0, 0.20),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOutCubic));
 
@@ -133,22 +214,41 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
     super.dispose();
   }
 
-  // Save Vehicle
+  // =======================================================
+  // SNACKBAR GLOBAL
+  // =======================================================
+  void _showSnack(String message, {bool success = false}) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          backgroundColor: success
+              ? const Color(0xFF27AE60)
+              : Colors.red.shade700,
+          content: Text(message),
+        ),
+      );
+  }
+
+  // =======================================================
+  // SIMPAN DATA KENDARAAN
+  // =======================================================
   Future<void> simpanData() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => loading = true);
 
     try {
       final user = FirebaseAuth.instance.currentUser;
+
       if (user == null) {
-        // Sesi habis / user belum login
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Sesi kamu habis. Silakan login kembali."),
-          ),
-        );
-        Navigator.of(context).pop(); // balik ke sebelumnya (misal login)
+        _showSnack("Sesi habis, silakan login kembali.");
+        Navigator.pop(context);
         return;
       }
 
@@ -162,40 +262,36 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
         km: kilometer.text.trim().isEmpty ? null : kilometer.text.trim(),
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Data kendaraan berhasil disimpan!")),
-      );
+      _showSnack("Data kendaraan berhasil disimpan!", success: true);
 
-      Navigator.pop(context);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Gagal menyimpan data kendaraan. Coba lagi."),
-        ),
+      // Setelah simpan → ke dashboard
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeDashboard()),
+        (route) => false,
       );
+    } catch (e) {
+      _showSnack("Gagal menyimpan data. Coba lagi.");
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      if (mounted) setState(() => loading = false);
     }
   }
 
-  // TextField floating label
   InputDecoration _input(String label, {IconData? icon}) {
     return InputDecoration(
-      labelText: label, // ← FLOATING LABEL
+      labelText: label,
       prefixIcon: icon == null ? null : Icon(icon),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r)),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12.r),
-        borderSide: const BorderSide(color: Color(0xFFDB0C0C), width: 1.4),
+        borderSide: const BorderSide(color: Color(0xFFDB0C0C), width: 1.5),
       ),
     );
   }
 
-  // ---------------------------------------------------------
+  // =======================================================
   // UI
-  // ---------------------------------------------------------
+  // =======================================================
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -229,15 +325,16 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                               style: TextStyle(
                                 fontSize: 28.sp,
                                 fontWeight: FontWeight.w800,
+                                height: 1.2,
                               ),
                             ),
+
                             SizedBox(height: 24.h),
 
                             Form(
                               key: _formKey,
                               child: Column(
                                 children: [
-                                  // Jenis Kendaraan — floating label + icon dinamis
                                   SlimDropdown(
                                     label: "Jenis Kendaraan",
                                     value: jenisKendaraan,
@@ -253,7 +350,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                                   ),
                                   SizedBox(height: 20.h),
 
-                                  // Nomor Polisi — floating label
                                   TextFormField(
                                     controller: nomorPolisi,
                                     inputFormatters: const [
@@ -264,18 +360,20 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                                       if (v == null || v.isEmpty) {
                                         return "Wajib diisi";
                                       }
+
                                       final reg = RegExp(
                                         r'^[A-Z]{1,2}\s?[0-9]{1,4}\s?[A-Z]{1,3}$',
                                       );
+
                                       if (!reg.hasMatch(v)) {
-                                        return "Format tidak valid";
+                                        return "Format tidak valid (ex: B 1234 CD)";
                                       }
+
                                       return null;
                                     },
                                   ),
                                   SizedBox(height: 20.h),
 
-                                  // Merek — floating label
                                   SlimDropdown(
                                     label: "Merek",
                                     value: merek,
@@ -284,7 +382,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                                                 ? modelMotor.keys
                                                 : modelMobil.keys)
                                             .toList(),
-                                    icon: null,
                                     onChanged: (v) {
                                       setState(() {
                                         merek = v;
@@ -296,7 +393,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                                   ),
                                   SizedBox(height: 20.h),
 
-                                  // Model — floating label
                                   SlimDropdown(
                                     label: "Model",
                                     value: model,
@@ -305,14 +401,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                                         : (jenisKendaraan == "Motor"
                                               ? modelMotor[merek]!
                                               : modelMobil[merek]!),
-                                    icon: null,
                                     onChanged: (v) => setState(() => model = v),
                                     validator: (v) =>
                                         v == null ? "Pilih model" : null,
                                   ),
                                   SizedBox(height: 20.h),
 
-                                  // Tahun — floating label
                                   SlimDropdown(
                                     label: "Tahun",
                                     value: tahun,
@@ -320,14 +414,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                                       16,
                                       (i) => (2010 + i).toString(),
                                     ),
-                                    icon: null,
                                     onChanged: (v) => setState(() => tahun = v),
                                     validator: (v) =>
                                         v == null ? "Pilih tahun" : null,
                                   ),
                                   SizedBox(height: 20.h),
 
-                                  // Kilometer — floating label + icon
                                   TextFormField(
                                     controller: kilometer,
                                     keyboardType: TextInputType.number,
@@ -345,7 +437,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen>
                                   ),
                                   SizedBox(height: 30.h),
 
-                                  // Button Simpan
                                   SizedBox(
                                     width: double.infinity,
                                     height: 50.h,

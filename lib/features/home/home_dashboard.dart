@@ -4,14 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:bengkelku/features/auth/services/auth_service.dart';
 import '../../models/bengkel_model.dart';
 import '../bengkel/bengkel_detail.dart';
 import '../profile/profile.dart';
 import '../../widgets/navbar.dart';
 import '../chat/chat.dart';
 import '../riwayat/riwayat.dart';
-import '../auth/login_screen.dart';
+import '../auth/screen/login_screen.dart';
 
 class HomeDashboard extends StatefulWidget {
   const HomeDashboard({super.key});
@@ -23,7 +23,11 @@ class HomeDashboard extends StatefulWidget {
 class _HomeDashboardState extends State<HomeDashboard> {
   int _selectedIndex = 0;
 
-  User? get _user => FirebaseAuth.instance.currentUser;
+  static const AssetImage _defaultWorkshopImage = AssetImage(
+    'assets/default_bengkel.png',
+  );
+
+  User? get _user => AuthService.instance.currentUser;
 
   String get _displayName {
     final name = _user?.displayName;
@@ -41,6 +45,16 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return (parts.first[0] + parts.last[0]).toUpperCase();
   }
 
+  String? _userPhone;
+
+  /// search
+  late final TextEditingController _searchController;
+  String _searchQuery = "";
+
+  /// filter
+  bool _filterOpenNow = false;
+  bool _filterHighRating = false;
+
   /// Stream bengkel dari Firestore
   Stream<List<Bengkel>> get _bengkelStream {
     return FirebaseFirestore.instance
@@ -49,11 +63,154 @@ class _HomeDashboardState extends State<HomeDashboard> {
         .map((snap) => snap.docs.map((d) => Bengkel.fromDoc(d)).toList());
   }
 
+  @override
+  void initState() {
+    super.initState();
+    _searchController = TextEditingController();
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final user = _user;
+    if (user == null) return;
+
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+
+      if (!doc.exists) return;
+      final data = doc.data();
+
+      if (!mounted) return;
+      setState(() {
+        // city sekarang diambil langsung via StreamBuilder di header
+        _userPhone = (data?['phone'] as String?)?.trim();
+      });
+    } catch (_) {
+      // boleh diabaikan (misal offline)
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(_defaultWorkshopImage, context);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   // buka halaman detail bengkel
   void _openBengkelDetail(Bengkel b) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => BengkelDetailPage(bengkel: b)),
+    );
+  }
+
+  void _openFilterBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (_) {
+        // pakai variabel sementara supaya bisa diubah di dalam bottom sheet
+        bool tempOpenNow = _filterOpenNow;
+        bool tempHighRating = _filterHighRating;
+
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 16.h),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40.w,
+                      height: 4.h,
+                      margin: EdgeInsets.only(bottom: 12.h),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    "Filter bengkel",
+                    style: TextStyle(
+                      fontSize: 15.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text("Buka sekarang"),
+                    value: tempOpenNow,
+                    onChanged: (val) {
+                      setModalState(() => tempOpenNow = val);
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text("Rating 4.5+"),
+                    value: tempHighRating,
+                    onChanged: (val) {
+                      setModalState(() => tempHighRating = val);
+                    },
+                  ),
+
+                  SizedBox(height: 8.h),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44.h,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFDB0C0C),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _filterOpenNow = tempOpenNow;
+                          _filterHighRating = tempHighRating;
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        "Terapkan",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _filterOpenNow = false;
+                        _filterHighRating = false;
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: const Text("Reset filter"),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -132,7 +289,7 @@ class _HomeDashboardState extends State<HomeDashboard> {
 
                   SizedBox(height: 24.h),
 
-                  // Yellow button
+                  // Red button
                   SizedBox(
                     width: double.infinity,
                     height: 46.h,
@@ -192,11 +349,28 @@ class _HomeDashboardState extends State<HomeDashboard> {
   Widget _buildHomeTab(BuildContext context) {
     const double mapHeightFactor = 160;
 
+    final String rawQuery = _searchQuery.trim();
+    final String q = rawQuery.toLowerCase();
+    final bool isSearching = q.isNotEmpty;
+
+    final bool isPromoSearch = isSearching && q.contains('promo');
+    final bool isBengkelSearch = isSearching && !isPromoSearch;
+
+    // judul umum waktu search
+    final String searchTitle = isSearching ? 'Hasil pencarian "$rawQuery"' : '';
+
+    // jarak konten dari atas (kuning fleksibel)
+    final double contentTop = isSearching
+        ? (145)
+              .h // cuma tinggi search bar
+        : (145 + mapHeightFactor + 24).h; // search bar + map
+
     return SingleChildScrollView(
       child: Stack(
         children: [
-          _buildYellowHeader(),
+          _buildYellowHeader(isSearching),
 
+          // SEARCH BAR
           Positioned(
             top: 75.h,
             left: 16.w,
@@ -204,130 +378,202 @@ class _HomeDashboardState extends State<HomeDashboard> {
             child: _buildSearchBar(),
           ),
 
-          Positioned(
-            top: 140.h,
-            left: 16.w,
-            right: 16.w,
-            child: _buildMapCard(),
-          ),
-
-          Padding(
-            padding: EdgeInsets.only(
-              top: (145 + mapHeightFactor + 24).h,
-              bottom: 16.h,
+          // MAP CARD hanya muncul saat TIDAK searching
+          if (!isSearching)
+            Positioned(
+              top: 140.h,
+              left: 16.w,
+              right: 16.w,
+              child: _buildMapCard(),
             ),
+
+          // KONTEN DI BAWAH
+          Padding(
+            padding: EdgeInsets.only(top: contentTop, bottom: 16.h),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Aksi cepat
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: _buildMenuGrid(),
-                ),
-
-                SizedBox(height: 16.h),
-
-                // Kartu XP / EXP
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: _buildXpCard(),
-                ),
-
-                SizedBox(height: 16.h),
-
-                // Judul promo
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: Text(
-                    "Ada promo menarik buat kamu nih ~",
-                    style: TextStyle(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-
-                SizedBox(height: 8.h),
-
-                // List promo dengan gambar
-                SizedBox(
-                  height: 230.h,
-                  child: ListView.separated(
+                // ==========================
+                //   MODE : TIDAK SEARCHING
+                // ==========================
+                if (!isSearching) ...[
+                  Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16.w),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: 3,
-                    separatorBuilder: (_, __) => SizedBox(width: 12.w),
-                    itemBuilder: (_, __) => _buildPromoCard(),
+                    child: _buildMenuGrid(),
                   ),
-                ),
-
-                SizedBox(height: 16.h),
-
-                // ================== REKOMENDASI DARI FIRESTORE ==================
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: Text(
-                    "Rekomendasi buat kamu ~",
-                    style: TextStyle(
-                      fontSize: 15.sp,
-                      fontWeight: FontWeight.w600,
+                  SizedBox(height: 16.h),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    child: _buildXpCard(),
+                  ),
+                  SizedBox(height: 16.h),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    child: Text(
+                      "Ada promo menarik buat kamu nih ~",
+                      style: TextStyle(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
+                  SizedBox(height: 8.h),
+                  SizedBox(
+                    height: 230.h,
+                    child: ListView.separated(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: 3,
+                      separatorBuilder: (_, __) => SizedBox(width: 12.w),
+                      itemBuilder: (_, __) => _buildPromoCard(),
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                ],
 
-                SizedBox(height: 8.h),
+                // ==========================
+                //   MODE : SEARCH PROMO
+                // ==========================
+                if (isPromoSearch) ...[
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(20.w, 4.h, 20.w, 0),
+                    child: Text(
+                      searchTitle, // "Hasil pencarian "promo""
+                      style: TextStyle(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 20.h),
+                  SizedBox(
+                    height: 230.h,
+                    child: ListView.separated(
+                      padding: EdgeInsets.symmetric(horizontal: 16.w),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: 3,
+                      separatorBuilder: (_, __) => SizedBox(width: 12.w),
+                      itemBuilder: (_, __) => _buildPromoCard(),
+                    ),
+                  ),
+                ],
 
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: StreamBuilder<List<Bengkel>>(
-                    stream: _bengkelStream,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
+                // ==========================
+                //   MODE : BENGKEL LIST
+                // ==========================
+                if (!isSearching || isBengkelSearch) ...[
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(20.w, 4.h, 20.w, 0),
+                    child: Text(
+                      isBengkelSearch
+                          ? searchTitle
+                          : "Rekomendasi bengkel untukmu",
+                      style: TextStyle(
+                        fontSize: 15.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 20.h),
 
-                      if (snapshot.hasError) {
-                        return const Text("Gagal memuat bengkel");
-                      }
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    child: StreamBuilder<List<Bengkel>>(
+                      stream: _bengkelStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
 
-                      final list = snapshot.data ?? [];
+                        if (snapshot.hasError) {
+                          return const Text("Gagal memuat bengkel");
+                        }
 
-                      if (list.isEmpty) {
-                        return const Text("Belum ada bengkel terdaftar");
-                      }
+                        final all = snapshot.data ?? [];
 
-                      // Layout: 2 kartu kecil di atas, sisanya list besar di bawah
-                      return Column(
-                        children: [
-                          // ROW 2 KARTU KECIL
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildBengkelCompactCard(list[0]),
+                        if (all.isEmpty) {
+                          return const Text("Belum ada bengkel terdaftar");
+                        }
+
+                        List<Bengkel> list = all;
+                        if (isBengkelSearch) {
+                          list = list.where((b) {
+                            final name = b.nama.toLowerCase();
+                            final desc = b.deskripsi.toLowerCase();
+                            return name.contains(q) || desc.contains(q);
+                          }).toList();
+                        }
+
+                        if (_filterOpenNow) {
+                          list = list.where((b) => b.buka).toList();
+                        }
+
+                        if (_filterHighRating) {
+                          list = list.where((b) => b.rating >= 4.5).toList();
+                        }
+
+                        list.sort((a, b) => b.rating.compareTo(a.rating));
+
+                        if (list.isEmpty) {
+                          return SizedBox(
+                            width: double.infinity,
+                            child: Padding(
+                              padding: EdgeInsets.only(top: 40.h),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.search_off_rounded,
+                                    size: 56,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 12.h),
+                                  Text(
+                                    "Tidak ada bengkel yang cocok\n dengan pencarian / filter.",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 15.sp,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              if (list.length > 1) ...[
-                                SizedBox(width: 12.w),
+                            ),
+                          );
+                        }
+
+                        return Column(
+                          children: [
+                            Row(
+                              children: [
                                 Expanded(
-                                  child: _buildBengkelCompactCard(list[1]),
+                                  child: _buildBengkelCompactCard(list[0]),
                                 ),
+                                if (list.length > 1) ...[
+                                  SizedBox(width: 12.w),
+                                  Expanded(
+                                    child: _buildBengkelCompactCard(list[1]),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            if (list.length > 2) ...[
+                              SizedBox(height: 16.h),
+                              for (int i = 2; i < list.length; i++) ...[
+                                _buildBengkelListCard(list[i]),
+                                SizedBox(height: 12.h),
                               ],
                             ],
-                          ),
-
-                          if (list.length > 2) ...[
-                            SizedBox(height: 16.h),
-
-                            // LIST BESAR DI BAWAH
-                            for (int i = 2; i < list.length; i++) ...[
-                              _buildBengkelListCard(list[i]),
-                              SizedBox(height: 12.h),
-                            ],
                           ],
-                        ],
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -340,53 +586,152 @@ class _HomeDashboardState extends State<HomeDashboard> {
   //                    HEADER KUNING
   // =====================================================
 
-  Widget _buildYellowHeader() {
-    return Container(
-      height: 210.h,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFD740),
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
-      ),
-      child: Transform.translate(
-        offset: Offset(0, -73.h),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24.r,
-                backgroundColor: Colors.white,
-                child: Text(
-                  _initials,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18.sp,
-                    color: const Color(0xFFDB0C0C),
-                  ),
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text("Halo", style: TextStyle(fontSize: 13.sp)),
-                  Text(
-                    _displayName,
+  Widget _buildYellowHeader(bool isSearching) {
+    final user = _user;
+    final double headerHeight = isSearching ? 180.h : 210.h;
+
+    // fallback kalau user belum login
+    if (user == null) {
+      return Container(
+        height: headerHeight,
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          color: Color(0xFFFFD740),
+          borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+        ),
+        child: Transform.translate(
+          offset: Offset(0, -73.h),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24.r,
+                  backgroundColor: Colors.white,
+                  child: Text(
+                    _initials,
                     style: TextStyle(
-                      fontSize: 16.sp,
                       fontWeight: FontWeight.bold,
+                      fontSize: 18.sp,
+                      color: const Color(0xFFDB0C0C),
                     ),
                   ),
-                ],
-              ),
-              const Spacer(),
-              const Icon(Icons.notifications_none),
-            ],
+                ),
+                SizedBox(width: 12.w),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text("Halo", style: TextStyle(fontSize: 13.sp)),
+                    Text(
+                      _displayName,
+                      style: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const Spacer(),
+                const Icon(Icons.notifications_none),
+              ],
+            ),
           ),
         ),
-      ),
+      );
+    }
+
+    // versi pakai StreamBuilder biar city auto update setelah edit profil
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        String? userCity;
+
+        if (snapshot.hasData && snapshot.data!.data() != null) {
+          final data = snapshot.data!.data()!;
+          userCity = (data['city'] as String?)?.trim();
+        }
+
+        return Container(
+          height: headerHeight,
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFD740),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+          ),
+          child: Transform.translate(
+            offset: Offset(0, -73.h),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 0),
+              child: Row(
+                children: [
+                  // avatar bisa di-tap -> ke tab akun
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _selectedIndex = 3; // tab Akun
+                      });
+                    },
+                    borderRadius: BorderRadius.circular(999),
+                    child: CircleAvatar(
+                      radius: 24.r,
+                      backgroundColor: Colors.white,
+                      child: Text(
+                        _initials,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18.sp,
+                          color: const Color(0xFFDB0C0C),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text("Halo", style: TextStyle(fontSize: 13.sp)),
+                      Text(
+                        _displayName,
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (userCity != null && userCity.isNotEmpty) ...[
+                        SizedBox(height: 2.h),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 14.sp,
+                              color: Colors.black.withOpacity(0.6),
+                            ),
+                            SizedBox(width: 4.w),
+                            Text(
+                              userCity,
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                color: Colors.black.withOpacity(0.7),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.notifications_none),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -395,6 +740,8 @@ class _HomeDashboardState extends State<HomeDashboard> {
   // =====================================================
 
   Widget _buildSearchBar() {
+    final bool hasActiveFilter = _filterOpenNow || _filterHighRating;
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.w),
       decoration: BoxDecoration(
@@ -414,14 +761,30 @@ class _HomeDashboardState extends State<HomeDashboard> {
           SizedBox(width: 8.w),
           Expanded(
             child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value;
+                });
+              },
+              // 👉 Sekarang: tap di luar cuma nutup keyboard,
+              // TIDAK menghapus query / mode search
+              onTapOutside: (_) {
+                FocusScope.of(context).unfocus();
+              },
               decoration: InputDecoration(
                 border: InputBorder.none,
-                hintText: "Cari",
+                hintText: "Cari bengkel / promo",
                 hintStyle: TextStyle(fontSize: 14.sp, color: Colors.grey),
               ),
             ),
           ),
-          Icon(Icons.tune_rounded, color: Colors.grey[600]),
+          IconButton(
+            icon: const Icon(Icons.tune_rounded),
+            color: hasActiveFilter ? const Color(0xFFDB0C0C) : Colors.grey[600],
+            onPressed: _openFilterBottomSheet,
+            tooltip: "Filter",
+          ),
         ],
       ),
     );
@@ -912,11 +1275,22 @@ class _HomeDashboardState extends State<HomeDashboard> {
   }
 
   Widget _buildWorkshopImage({double? width, double? height}) {
-    return Container(
+    return SizedBox(
       width: width,
       height: height,
-      color: Colors.grey.shade200,
-      child: const Icon(Icons.car_repair, size: 40, color: Colors.grey),
+      child: Image(
+        image: _defaultWorkshopImage,
+        fit: BoxFit.cover,
+        filterQuality: FilterQuality.medium,
+        gaplessPlayback: true,
+        errorBuilder: (context, error, stackTrace) {
+          // fallback aman kalau asset belum ketemu
+          return Container(
+            color: Colors.grey.shade200,
+            child: const Icon(Icons.car_repair, size: 40, color: Colors.grey),
+          );
+        },
+      ),
     );
   }
 
@@ -936,12 +1310,13 @@ class _HomeDashboardState extends State<HomeDashboard> {
     return ProfileTab(
       name: _displayName,
       email: _user?.email ?? "-",
-      phone: null, // nanti bisa diisi dari Firestore
+      phone: _userPhone, // sekarang diisi dari Firestore
       onLogout: () async {
         final confirm = await _showLogoutDialog();
         if (confirm != true) return;
 
-        await FirebaseAuth.instance.signOut();
+        // Panggil AuthService, biar Google/Facebook juga ke-logout kalau ada
+        await AuthService.instance.logout();
 
         if (!mounted) return;
 
