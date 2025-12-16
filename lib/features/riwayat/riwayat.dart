@@ -1,7 +1,10 @@
-// ignore_for_file: unnecessary_underscores, deprecated_member_use
+// ignore_for_file: unnecessary_underscores, deprecated_member_use, curly_braces_in_flow_control_structures
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'riwayat_detail.dart';
 
 class RiwayatTab extends StatefulWidget {
   const RiwayatTab({super.key});
@@ -11,57 +14,113 @@ class RiwayatTab extends StatefulWidget {
 }
 
 class _RiwayatTabState extends State<RiwayatTab> {
-  // 0 = Semua, 1 = Proses, 2 = Selesai, 3 = Batal
   int _selectedFilter = 0;
 
-  final List<_OrderItem> _orders = [
-    _OrderItem(
-      customerName: 'Arion Regasta',
-      vehicle: 'Yamaha NMAX • B 1234 X',
-      service: 'Servis Rutin dan Ganti Ban',
-      date: '2 Nov 2025',
-      time: '10:00 WIB',
-      status: OrderStatus.pending,
-    ),
-    _OrderItem(
-      customerName: 'Arion Regasta',
-      vehicle: 'Honda Vario • B 5678 XY',
-      service: 'Ganti Oli Mesin',
-      date: '10 Nov 2025',
-      time: '14:30 WIB',
-      status: OrderStatus.process,
-    ),
-    _OrderItem(
-      customerName: 'Arion Regasta',
-      vehicle: 'Yamaha NMAX • B 1234 X',
-      service: 'Servis Ringan',
-      date: '20 Okt 2025',
-      time: '09:00 WIB',
-      status: OrderStatus.done,
-    ),
-    _OrderItem(
-      customerName: 'Arion Regasta',
-      vehicle: 'Honda Beat • B 9999 ZZ',
-      service: 'Tambal Ban',
-      date: '5 Okt 2025',
-      time: '19:00 WIB',
-      status: OrderStatus.cancelled,
-    ),
-  ];
+  DateTime _toDate(dynamic ts) {
+    if (ts is Timestamp) return ts.toDate();
+    if (ts is DateTime) return ts;
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  String _fmtDate(DateTime dt) {
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "Mei",
+      "Jun",
+      "Jul",
+      "Agu",
+      "Sep",
+      "Okt",
+      "Nov",
+      "Des",
+    ];
+    final d = dt.day;
+    final m = months[(dt.month - 1).clamp(0, 11)];
+    final y = dt.year;
+    return "$d $m $y";
+  }
+
+  DateTime _mergeDateAndJamStart(DateTime tanggal, String jam) {
+    try {
+      final startPart = jam.split('-').first.trim();
+      final parts = startPart.split(':');
+      final hh = int.parse(parts[0].trim());
+      final mm = int.parse(parts[1].trim());
+      return DateTime(tanggal.year, tanggal.month, tanggal.day, hh, mm);
+    } catch (_) {
+      return tanggal;
+    }
+  }
+
+  OrderStatus _parseStatus(dynamic raw) {
+    final s = (raw ?? "").toString().toLowerCase().trim();
+
+    if (s == "menunggu" || s == "pending" || s == "waiting") {
+      return OrderStatus.pending;
+    }
+    if (s == "proses" ||
+        s == "diproses" ||
+        s == "process" ||
+        s == "onprogress") {
+      return OrderStatus.process;
+    }
+    if (s == "selesai" || s == "done" || s == "finished" || s == "complete") {
+      return OrderStatus.done;
+    }
+    if (s == "batal" || s == "cancelled" || s == "canceled") {
+      return OrderStatus.cancelled;
+    }
+    return OrderStatus.pending;
+  }
+
+  String _layananToText(dynamic layanan) {
+    if (layanan is List) {
+      final names = <String>[];
+      for (final it in layanan) {
+        if (it is Map) {
+          final n = (it["nama"] ?? it["name"] ?? "").toString().trim();
+          if (n.isNotEmpty) names.add(n);
+        } else if (it is String) {
+          final n = it.trim();
+          if (n.isNotEmpty) names.add(n);
+        }
+      }
+      if (names.isNotEmpty) return names.join(", ");
+    }
+    return "-";
+  }
+
+  // ✅ RIWAYAT: pastikan label tampil pakai NOMOR POLISI
+  // format: "Motor • Honda Vario 125 • R 2412 ZE"
+  String _vehicleLabelFromBooking(Map<String, dynamic> data) {
+    final jenis = (data["jenisKendaraan"] ?? "").toString().trim();
+    final merek = (data["vehicleMerek"] ?? "").toString().trim();
+    final model = (data["vehicleModel"] ?? "").toString().trim();
+    final nopol = (data["nomorPolisi"] ?? "").toString().trim();
+
+    final brandModel = [
+      merek,
+      model,
+    ].where((e) => e.isNotEmpty).join(" ").trim();
+
+    final parts = <String>[];
+    if (jenis.isNotEmpty) parts.add(jenis);
+    if (brandModel.isNotEmpty) parts.add(brandModel);
+    if (nopol.isNotEmpty) parts.add(nopol);
+
+    if (parts.isNotEmpty) return parts.join(" • ");
+
+    // fallback kalau data lama
+    final direct = (data["vehicleLabel"] ?? "").toString().trim();
+    return direct.isNotEmpty ? direct : "-";
+  }
 
   @override
   Widget build(BuildContext context) {
-    // filter sesuai tab di atas
-    final filtered = _orders.where((o) {
-      if (_selectedFilter == 0) return true; // Semua
-      if (_selectedFilter == 1) {
-        return o.status == OrderStatus.process ||
-            o.status == OrderStatus.pending;
-      }
-      if (_selectedFilter == 2) return o.status == OrderStatus.done;
-      if (_selectedFilter == 3) return o.status == OrderStatus.cancelled;
-      return true;
-    }).toList();
+    final user = FirebaseAuth.instance.currentUser;
 
     return Container(
       color: Colors.white,
@@ -71,18 +130,13 @@ class _RiwayatTabState extends State<RiwayatTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(height: 12.h),
-
-            // Title
             Center(
               child: Text(
                 'Riwayat Pemesanan',
                 style: TextStyle(fontSize: 18.sp, fontWeight: FontWeight.w600),
               ),
             ),
-
             SizedBox(height: 12.h),
-
-            // TAB FILTER: Semua / Proses / Selesai / Batal
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: Row(
@@ -94,20 +148,116 @@ class _RiwayatTabState extends State<RiwayatTab> {
                 ],
               ),
             ),
-
             SizedBox(height: 12.h),
-
-            // LIST RIWAYAT
             Expanded(
-              child: ListView.separated(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                itemCount: filtered.length,
-                separatorBuilder: (_, __) => SizedBox(height: 12.h),
-                itemBuilder: (context, index) {
-                  final item = filtered[index];
-                  return _OrderCard(item: item);
-                },
-              ),
+              child: (user == null)
+                  ? Center(
+                      child: Text(
+                        "Silakan login untuk melihat riwayat.",
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    )
+                  : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                      stream: FirebaseFirestore.instance
+                          .collection("bookings")
+                          .where("userId", isEqualTo: user.uid)
+                          .snapshots(),
+                      builder: (context, snap) {
+                        if (snap.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        }
+
+                        if (snap.hasError) {
+                          return Center(
+                            child: Text(
+                              "Gagal memuat riwayat.\n${snap.error}",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          );
+                        }
+
+                        final docs = (snap.data?.docs ?? []).toList();
+                        if (docs.isEmpty) {
+                          return Center(
+                            child: Text(
+                              "Belum ada riwayat.",
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          );
+                        }
+
+                        final orders = docs.map((d) {
+                          final data = d.data();
+
+                          final bengkelNama = (data["bengkelNama"] ?? "Bengkel")
+                              .toString();
+
+                          final vehicleText = _vehicleLabelFromBooking(data);
+                          final layananText = _layananToText(data["layanan"]);
+
+                          final tanggal = _toDate(data["tanggal"]);
+                          final jam = (data["jam"] ?? "-").toString();
+
+                          final status = _parseStatus(data["status"]);
+
+                          final sortDt = (tanggal.millisecondsSinceEpoch == 0)
+                              ? _toDate(data["createdAt"])
+                              : _mergeDateAndJamStart(tanggal, jam);
+
+                          return _OrderItem(
+                            id: d.id,
+                            bengkelNama: bengkelNama,
+                            vehicle: vehicleText,
+                            layanan: layananText,
+                            date: (tanggal.millisecondsSinceEpoch == 0)
+                                ? "-"
+                                : _fmtDate(tanggal),
+                            time: jam.isEmpty ? "-" : jam,
+                            status: status,
+                            sortKey: sortDt.millisecondsSinceEpoch,
+                          );
+                        }).toList();
+
+                        orders.sort((a, b) => b.sortKey.compareTo(a.sortKey));
+
+                        final filtered = orders.where((o) {
+                          if (_selectedFilter == 0) return true;
+                          if (_selectedFilter == 1) {
+                            return o.status == OrderStatus.process ||
+                                o.status == OrderStatus.pending;
+                          }
+                          if (_selectedFilter == 2)
+                            return o.status == OrderStatus.done;
+                          if (_selectedFilter == 3)
+                            return o.status == OrderStatus.cancelled;
+                          return true;
+                        }).toList();
+
+                        return ListView.separated(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 16.w,
+                            vertical: 8.h,
+                          ),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                          itemBuilder: (context, index) {
+                            return _OrderCard(item: filtered[index]);
+                          },
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -120,9 +270,7 @@ class _RiwayatTabState extends State<RiwayatTab> {
 
     return Expanded(
       child: GestureDetector(
-        onTap: () {
-          setState(() => _selectedFilter = index);
-        },
+        onTap: () => setState(() => _selectedFilter = index),
         child: Container(
           height: 40.h,
           margin: EdgeInsets.only(right: index == 3 ? 0 : 8.w),
@@ -151,29 +299,29 @@ class _RiwayatTabState extends State<RiwayatTab> {
   }
 }
 
-// ===== MODEL DATA =====
-
 enum OrderStatus { pending, process, done, cancelled }
 
 class _OrderItem {
-  final String customerName;
+  final String id;
+  final String bengkelNama;
   final String vehicle;
-  final String service;
+  final String layanan;
   final String date;
   final String time;
   final OrderStatus status;
+  final int sortKey;
 
   _OrderItem({
-    required this.customerName,
+    required this.id,
+    required this.bengkelNama,
     required this.vehicle,
-    required this.service,
+    required this.layanan,
     required this.date,
     required this.time,
     required this.status,
+    required this.sortKey,
   });
 }
-
-// ===== KARTU RIWAYAT =====
 
 class _OrderCard extends StatelessWidget {
   final _OrderItem item;
@@ -204,7 +352,6 @@ class _OrderCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Nama + status chip
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -213,7 +360,7 @@ class _OrderCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.customerName,
+                      item.bengkelNama,
                       style: TextStyle(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w600,
@@ -226,6 +373,8 @@ class _OrderCard extends StatelessWidget {
                         fontSize: 12.sp,
                         color: Colors.grey[700],
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -247,10 +396,7 @@ class _OrderCard extends StatelessWidget {
               ),
             ],
           ),
-
           SizedBox(height: 10.h),
-
-          // service summary
           Container(
             width: double.infinity,
             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
@@ -259,14 +405,11 @@ class _OrderCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(12.r),
             ),
             child: Text(
-              item.service,
+              item.layanan,
               style: TextStyle(fontSize: 12.sp, color: Colors.grey[800]),
             ),
           ),
-
           SizedBox(height: 10.h),
-
-          // date + time + tombol detail
           Row(
             children: [
               Icon(
@@ -301,7 +444,12 @@ class _OrderCard extends StatelessWidget {
                   ),
                 ),
                 onPressed: () {
-                  // TODO: nanti arahkan ke detail riwayat
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => RiwayatDetailPage(bookingId: item.id),
+                    ),
+                  );
                 },
                 child: Text(
                   'Detail',
@@ -336,11 +484,11 @@ class _OrderCard extends StatelessWidget {
     switch (s) {
       case OrderStatus.pending:
       case OrderStatus.process:
-        return const Color(0xFFFFF3CD); // kuning muda
+        return const Color(0xFFFFF3CD);
       case OrderStatus.done:
-        return const Color(0xFFE8F5E9); // hijau muda
+        return const Color(0xFFE8F5E9);
       case OrderStatus.cancelled:
-        return const Color(0xFFFFEBEE); // merah muda
+        return const Color(0xFFFFEBEE);
     }
   }
 
@@ -348,11 +496,11 @@ class _OrderCard extends StatelessWidget {
     switch (s) {
       case OrderStatus.pending:
       case OrderStatus.process:
-        return const Color(0xFFF2994A); // oranye
+        return const Color(0xFFF2994A);
       case OrderStatus.done:
-        return const Color(0xFF2E7D32); // hijau
+        return const Color(0xFF2E7D32);
       case OrderStatus.cancelled:
-        return const Color(0xFFEB5757); // merah
+        return const Color(0xFFEB5757);
     }
   }
 }

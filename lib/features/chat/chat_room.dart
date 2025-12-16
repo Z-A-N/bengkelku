@@ -1,18 +1,198 @@
 // ignore_for_file: deprecated_member_use
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-class ChatRoomPage extends StatelessWidget {
+class ChatRoomPage extends StatefulWidget {
+  final String chatId;
   final String title;
 
-  const ChatRoomPage({super.key, required this.title});
+  /// Optional (buat kasus chat bengkel)
+  final String? bengkelId;
+
+  const ChatRoomPage({
+    super.key,
+    required this.chatId,
+    required this.title,
+    this.bengkelId,
+  });
+
+  @override
+  State<ChatRoomPage> createState() => _ChatRoomPageState();
+}
+
+class _ChatRoomPageState extends State<ChatRoomPage> {
+  final _textC = TextEditingController();
+  final _scrollC = ScrollController();
+  bool _sending = false;
+  bool _marking = false;
+
+  String? _uid;
+
+  DocumentReference<Map<String, dynamic>> get _chatRef =>
+      FirebaseFirestore.instance.collection('chats').doc(widget.chatId);
+
+  CollectionReference<Map<String, dynamic>> get _msgRef =>
+      _chatRef.collection('messages');
+
+  @override
+  void initState() {
+    super.initState();
+    _uid = FirebaseAuth.instance.currentUser?.uid;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _ensureChatExists();
+      await _markRead();
+    });
+  }
+
+  @override
+  void dispose() {
+    _textC.dispose();
+    _scrollC.dispose();
+    super.dispose();
+  }
+
+  Future<void> _ensureChatExists() async {
+    final uid = _uid;
+    if (uid == null) return;
+
+    final snap = await _chatRef.get();
+    if (snap.exists) return;
+
+    final peerId = widget.bengkelId != null
+        ? "bengkel:${widget.bengkelId}"
+        : "peer:unknown";
+
+    await _chatRef.set({
+      "chatId": widget.chatId,
+      "title": widget.title,
+      "type": widget.bengkelId != null ? "bengkel" : "direct",
+      "bengkelId": widget.bengkelId,
+      "participants": [uid, peerId],
+      "unread": {uid: 0, peerId: 0},
+      "lastMessage": "",
+      "lastMessageAt": FieldValue.serverTimestamp(),
+      "createdAt": FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> _markRead() async {
+    final uid = _uid;
+    if (uid == null) return;
+    if (_marking) return;
+
+    _marking = true;
+    try {
+      // ✅ pakai dot-notation string biar aman di versi yang ketat Map<String,dynamic>
+      await _chatRef.update({
+        "unread.$uid": 0,
+        "lastReadAt.$uid": FieldValue.serverTimestamp(),
+      });
+    } catch (_) {
+      await _ensureChatExists();
+      try {
+        await _chatRef.update({
+          "unread.$uid": 0,
+          "lastReadAt.$uid": FieldValue.serverTimestamp(),
+        });
+      } catch (_) {}
+    } finally {
+      _marking = false;
+    }
+  }
+
+  String _fmtTime(DateTime dt) {
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return "$h:$m";
+  }
+
+  Future<void> _send() async {
+    final uid = _uid;
+    if (uid == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Kamu harus login dulu.")));
+      return;
+    }
+
+    final text = _textC.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _sending = true);
+    _textC.clear();
+
+    await _ensureChatExists();
+
+    // cari peerId (buat increment unread peer)
+    String? peerId;
+    try {
+      final chatSnap = await _chatRef.get();
+      final data = chatSnap.data();
+      final participants = (data?["participants"] as List?) ?? [];
+      for (final p in participants) {
+        final s = p.toString();
+        if (s != uid) {
+          peerId = s;
+          break;
+        }
+      }
+    } catch (_) {}
+
+    final batch = FirebaseFirestore.instance.batch();
+    final msgDoc = _msgRef.doc();
+
+    batch.set(msgDoc, {
+      "id": msgDoc.id,
+      "text": text,
+      "senderId": uid,
+      "createdAt": FieldValue.serverTimestamp(),
+    });
+
+    // ✅ IMPORTANT: batch.update butuh Map<String, dynamic> (string key)
+    final updates = <String, dynamic>{
+      "lastMessage": text,
+      "lastMessageAt": FieldValue.serverTimestamp(),
+      "lastMessageSenderId": uid,
+    };
+
+    if (peerId != null && peerId.isNotEmpty) {
+      // ✅ dot-notation untuk update nested map
+      updates["unread.$peerId"] = FieldValue.increment(1);
+    }
+
+    batch.update(_chatRef, updates);
+
+    try {
+      await batch.commit();
+
+      if (!mounted) return;
+      await _markRead();
+
+      if (_scrollC.hasClients) {
+        _scrollC.animateTo(
+          0,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Gagal kirim pesan: $e")));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      // AppBar kuning custom biar mirip desain
       body: SafeArea(
         child: Column(
           children: [
@@ -43,19 +223,30 @@ class ChatRoomPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  widget.title,
                   style: TextStyle(
                     fontSize: 16.sp,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 SizedBox(height: 2.h),
-                Text(
-                  'Terakhir dilihat 45 menit lalu',
-                  style: TextStyle(
-                    fontSize: 11.sp,
-                    color: Colors.black.withOpacity(0.7),
-                  ),
+                StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+                  stream: _chatRef.snapshots(),
+                  builder: (context, snap) {
+                    final data = snap.data?.data();
+                    final ts = data?["lastMessageAt"];
+                    String sub = "—";
+                    if (ts is Timestamp) {
+                      sub = "Aktif ${_fmtTime(ts.toDate())}";
+                    }
+                    return Text(
+                      sub,
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: Colors.black.withOpacity(0.7),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -70,39 +261,58 @@ class ChatRoomPage extends StatelessWidget {
   }
 
   Widget _buildMessagesList() {
-    // dummy messages – nanti bisa diganti dari backend
-    final messages = [
-      _Message(text: 'Hi team 👋', time: '11:31 AM', isMe: true),
-      _Message(text: 'Anyone on for lunch today', time: '11:31 AM', isMe: true),
-      _Message(
-        text: 'I\'m down! Any ideas??',
-        time: '11:35 AM',
-        isMe: false,
-        sender: 'Jav',
-        subtitle: 'Engineering',
-      ),
-      _Message(text: 'Let me know', time: '11:41 AM', isMe: false),
-    ];
+    final uid = _uid;
+    if (uid == null) {
+      return const Center(child: Text("Silakan login untuk chat."));
+    }
 
-    return ListView.builder(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
-      itemCount: messages.length + 1,
-      itemBuilder: (context, index) {
-        if (index == 0) {
-          // tanggal di tengah
-          return Padding(
-            padding: EdgeInsets.only(bottom: 16.h),
-            child: Center(
-              child: Text(
-                '8/20/2020',
-                style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
-              ),
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _msgRef.orderBy("createdAt", descending: true).snapshots(),
+      builder: (context, snap) {
+        if (snap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snap.hasError) {
+          return const Center(child: Text("Gagal memuat chat"));
+        }
+
+        final docs = snap.data?.docs ?? [];
+        if (docs.isEmpty) {
+          return Center(
+            child: Text(
+              "Mulai chat yuk 👋",
+              style: TextStyle(fontSize: 13.sp, color: Colors.grey[700]),
             ),
           );
         }
 
-        final msg = messages[index - 1];
-        return _MessageBubble(message: msg);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _markRead();
+        });
+
+        return ListView.builder(
+          controller: _scrollC,
+          reverse: true,
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+          itemCount: docs.length,
+          itemBuilder: (context, index) {
+            final data = docs[index].data();
+            final text = (data["text"] ?? "").toString();
+            final senderId = (data["senderId"] ?? "").toString();
+            final isMe = senderId == uid;
+            final ts = data["createdAt"];
+            final time = (ts is Timestamp) ? _fmtTime(ts.toDate()) : "";
+
+            return _MessageBubble(
+              message: _Message(
+                text: text,
+                time: time,
+                isMe: isMe,
+                sender: isMe ? null : widget.title,
+              ),
+            );
+          },
+        );
       },
     );
   }
@@ -125,6 +335,11 @@ class ChatRoomPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24.r),
               ),
               child: TextField(
+                controller: _textC,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) {
+                  if (!_sending) _send();
+                },
                 decoration: InputDecoration(
                   border: InputBorder.none,
                   hintText: 'Start typing...',
@@ -137,28 +352,27 @@ class ChatRoomPage extends StatelessWidget {
             onPressed: () {},
             icon: const Icon(Icons.emoji_emotions_outlined),
           ),
-          IconButton(onPressed: () {}, icon: const Icon(Icons.send_rounded)),
+          IconButton(
+            onPressed: _sending ? null : _send,
+            icon: const Icon(Icons.send_rounded),
+          ),
         ],
       ),
     );
   }
 }
 
-// ===== MODEL & BUBBLE CHAT =====
-
 class _Message {
   final String text;
   final String time;
   final bool isMe;
   final String? sender;
-  final String? subtitle;
 
   _Message({
     required this.text,
     required this.time,
     required this.isMe,
     this.sender,
-    this.subtitle,
   });
 }
 
@@ -170,7 +384,6 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (message.isMe) {
-      // bubble kuning (punya user)
       return Padding(
         padding: EdgeInsets.only(left: 80.w, bottom: 8.h),
         child: Column(
@@ -185,15 +398,15 @@ class _MessageBubble extends StatelessWidget {
               child: Text(message.text, style: TextStyle(fontSize: 13.sp)),
             ),
             SizedBox(height: 2.h),
-            Text(
-              message.time,
-              style: TextStyle(fontSize: 10.sp, color: Colors.grey[600]),
-            ),
+            if (message.time.isNotEmpty)
+              Text(
+                message.time,
+                style: TextStyle(fontSize: 10.sp, color: Colors.grey[600]),
+              ),
           ],
         ),
       );
     } else {
-      // bubble abu (punya bengkel / orang lain)
       return Padding(
         padding: EdgeInsets.only(right: 80.w, bottom: 8.h),
         child: Row(
@@ -203,8 +416,8 @@ class _MessageBubble extends StatelessWidget {
               radius: 14.r,
               backgroundColor: Colors.grey[300],
               child: Text(
-                message.sender != null && message.sender!.isNotEmpty
-                    ? message.sender![0]
+                (message.sender != null && message.sender!.isNotEmpty)
+                    ? message.sender![0].toUpperCase()
                     : 'B',
                 style: TextStyle(fontSize: 12.sp, fontWeight: FontWeight.w600),
               ),
@@ -222,14 +435,6 @@ class _MessageBubble extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    if (message.subtitle != null)
-                      Text(
-                        message.subtitle!,
-                        style: TextStyle(
-                          fontSize: 11.sp,
-                          color: Colors.grey[600],
-                        ),
-                      ),
                     SizedBox(height: 4.h),
                   ],
                   Container(
@@ -247,10 +452,14 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                   SizedBox(height: 2.h),
-                  Text(
-                    message.time,
-                    style: TextStyle(fontSize: 10.sp, color: Colors.grey[600]),
-                  ),
+                  if (message.time.isNotEmpty)
+                    Text(
+                      message.time,
+                      style: TextStyle(
+                        fontSize: 10.sp,
+                        color: Colors.grey[600],
+                      ),
+                    ),
                 ],
               ),
             ),

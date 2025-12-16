@@ -1,28 +1,50 @@
-// ignore_for_file: deprecated_member_use, dead_code
+// ignore_for_file: deprecated_member_use, dead_code, unnecessary_null_comparison, unnecessary_underscores, curly_braces_in_flow_control_structures, use_build_context_synchronously
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../models/bengkel_model.dart';
-import '../booking/booking_summary.dart'; // <- di sini ada class LayananItem
+import '../booking/booking_summary.dart';
+import '../chat/chat_room.dart';
 
-class BengkelDetailPage extends StatelessWidget {
+class BengkelDetailPage extends StatefulWidget {
   final Bengkel bengkel;
 
   const BengkelDetailPage({super.key, required this.bengkel});
 
   @override
+  State<BengkelDetailPage> createState() => _BengkelDetailPageState();
+}
+
+class _BengkelDetailPageState extends State<BengkelDetailPage> {
+  /// Shared state: layanan yang dipilih (dipakai tab layanan + bottom bar)
+  final ValueNotifier<List<LayananItem>> _selectedLayanan =
+      ValueNotifier<List<LayananItem>>([]);
+
+  @override
+  void dispose() {
+    _selectedLayanan.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final bengkel = widget.bengkel;
+
     return DefaultTabController(
       length: 3,
       child: Scaffold(
         backgroundColor: Colors.white,
-        bottomNavigationBar: _BottomActionBar(bengkel: bengkel),
+        bottomNavigationBar: _BottomActionBar(
+          bengkel: bengkel,
+          selectedLayanan: _selectedLayanan,
+        ),
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
-              const SliverToBoxAdapter(child: _HeaderImage()),
+              SliverToBoxAdapter(child: _HeaderImage(fotoUrl: bengkel.foto)),
               SliverToBoxAdapter(child: _BengkelSummary(bengkel: bengkel)),
               SliverPersistentHeader(
                 pinned: true,
@@ -53,7 +75,9 @@ class BengkelDetailPage extends StatelessWidget {
           body: TabBarView(
             children: [
               _InfoTab(bengkel: bengkel),
-              _LayananTab(bengkel: bengkel),
+              _LayananTab(bengkel: bengkel, selectedLayanan: _selectedLayanan),
+
+              // ✅ FIX: widget ulasan sekarang ADA
               _UlasanTab(bengkelId: bengkel.id),
             ],
           ),
@@ -68,17 +92,30 @@ class BengkelDetailPage extends StatelessWidget {
 ///////////////////////////////////////////////////////////////////////////
 
 class _HeaderImage extends StatelessWidget {
-  const _HeaderImage();
+  final String fotoUrl;
+
+  const _HeaderImage({required this.fotoUrl});
 
   @override
   Widget build(BuildContext context) {
+    final hasUrl = fotoUrl.trim().isNotEmpty;
+
     return SizedBox(
       height: 230.h,
       width: double.infinity,
       child: Stack(
         children: [
           Positioned.fill(
-            child: Image.asset('assets/workshop_sample.jpg', fit: BoxFit.cover),
+            child: hasUrl
+                ? Image.network(
+                    fotoUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Image.asset(
+                      'assets/workshop_sample.jpg',
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Image.asset('assets/workshop_sample.jpg', fit: BoxFit.cover),
           ),
           Positioned.fill(
             child: Align(
@@ -244,9 +281,7 @@ class _InfoTab extends StatelessWidget {
           width: double.infinity,
           height: 44.h,
           child: OutlinedButton(
-            onPressed: () {
-              // TODO: buka maps
-            },
+            onPressed: () {},
             style: OutlinedButton.styleFrom(
               side: const BorderSide(color: Color(0xFFDB0C0C), width: 1.4),
               shape: RoundedRectangleBorder(
@@ -325,56 +360,41 @@ class _InfoDay extends StatelessWidget {
 }
 
 ///////////////////////////////////////////////////////////////////////////
-/// TAB LAYANAN  (ambil dari subcollection Firestore)
+/// TAB LAYANAN
 ///////////////////////////////////////////////////////////////////////////
 
 class _LayananTab extends StatefulWidget {
   final Bengkel bengkel;
+  final ValueNotifier<List<LayananItem>> selectedLayanan;
 
-  const _LayananTab({required this.bengkel});
+  const _LayananTab({required this.bengkel, required this.selectedLayanan});
 
   @override
   State<_LayananTab> createState() => _LayananTabState();
 }
 
 class _LayananTabState extends State<_LayananTab> {
-  /// layanan yang sudah pernah dipilih user (disimpan supaya tidak hilang)
-  List<LayananItem> _selected = [];
-
-  bool _isSelected(String id) {
-    return _selected.any((e) => e.id == id);
+  bool _isSelected(List<LayananItem> selected, String id) {
+    return selected.any((e) => e.id == id);
   }
 
-  Future<void> _onPilihLayanan(QueryDocumentSnapshot doc) async {
+  void _toggleLayanan(QueryDocumentSnapshot doc, bool selectedNow) {
     final hargaNum = (doc['harga'] ?? 0) as num;
 
     final item = LayananItem(
       id: doc.id,
-      nama: doc['nama'] ?? '-',
+      nama: (doc['nama'] ?? '-').toString(),
       harga: hargaNum.toInt(),
     );
 
-    // kalau item belum ada di list, tambahkan
-    if (!_isSelected(item.id)) {
-      _selected = [..._selected, item];
-    }
+    final current = widget.selectedLayanan.value;
 
-    // buka Ringkasan Booking dengan SEMUA layanan yang sudah dipilih
-    final result = await Navigator.push<List<LayananItem>>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => BookingSummaryPage(
-          bengkel: widget.bengkel,
-          layananDipilih: List<LayananItem>.from(_selected),
-        ),
-      ),
-    );
-
-    // result = list terbaru dari BookingSummary (setelah user hapus di sana)
-    if (result != null) {
-      setState(() {
-        _selected = result;
-      });
+    if (selectedNow) {
+      widget.selectedLayanan.value = current
+          .where((e) => e.id != item.id)
+          .toList();
+    } else {
+      widget.selectedLayanan.value = [...current, item];
     }
   }
 
@@ -398,7 +418,6 @@ class _LayananTabState extends State<_LayananTab> {
         }
 
         final docs = snapshot.data?.docs ?? [];
-
         if (docs.isEmpty) {
           return Center(
             child: Text(
@@ -408,30 +427,63 @@ class _LayananTabState extends State<_LayananTab> {
           );
         }
 
-        return ListView(
-          padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
-          children: [
-            Text(
-              "Layanan Tersedia",
-              style: TextStyle(fontSize: 15.sp, fontWeight: FontWeight.w700),
-            ),
-            SizedBox(height: 10.h),
-
-            for (final doc in docs) ...[
-              _ServiceItem(
-                title: doc['nama'] ?? '-',
-                subtitle: doc['deskripsi'] ?? '',
-                price: (doc['harga'] ?? 0).toString(),
-                filled: true,
-                // kalau sudah pernah dipilih, teks bisa kamu ganti bebas
-                buttonText: _isSelected(doc.id)
-                    ? "Pesan (sudah dipilih)"
-                    : "Pesan",
-                onPressed: () => _onPilihLayanan(doc),
-              ),
-              SizedBox(height: 10.h),
-            ],
-          ],
+        return ValueListenableBuilder<List<LayananItem>>(
+          valueListenable: widget.selectedLayanan,
+          builder: (context, selected, _) {
+            return ListView(
+              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "Layanan Tersedia",
+                        style: TextStyle(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (selected.isNotEmpty)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10.w,
+                          vertical: 6.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3CD),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          "${selected.length} dipilih",
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                SizedBox(height: 10.h),
+                for (final doc in docs) ...[
+                  Builder(
+                    builder: (_) {
+                      final selectedNow = _isSelected(selected, doc.id);
+                      return _ServiceItem(
+                        title: (doc['nama'] ?? '-').toString(),
+                        subtitle: (doc['deskripsi'] ?? '').toString(),
+                        price: (doc['harga'] ?? 0).toString(),
+                        filled: !selectedNow,
+                        buttonText: selectedNow ? "Batalkan" : "Tambah",
+                        onPressed: () => _toggleLayanan(doc, selectedNow),
+                      );
+                    },
+                  ),
+                  SizedBox(height: 10.h),
+                ],
+              ],
+            );
+          },
         );
       },
     );
@@ -561,13 +613,27 @@ class _ServiceItem extends StatelessWidget {
 }
 
 ///////////////////////////////////////////////////////////////////////////
-/// TAB ULASAN
+/// ✅ TAB ULASAN (FIX: sekarang ADA)
 ///////////////////////////////////////////////////////////////////////////
 
 class _UlasanTab extends StatelessWidget {
   final String bengkelId;
 
   const _UlasanTab({required this.bengkelId});
+
+  String _timeAgo(DateTime time) {
+    final diff = DateTime.now().difference(time);
+    if (diff.inSeconds < 60) return "${diff.inSeconds} dtk lalu";
+    if (diff.inMinutes < 60) return "${diff.inMinutes} mnt lalu";
+    if (diff.inHours < 24) return "${diff.inHours} jam lalu";
+    if (diff.inDays < 7) return "${diff.inDays} hari lalu";
+    final weeks = (diff.inDays / 7).floor();
+    if (weeks < 4) return "$weeks minggu lalu";
+    final months = (diff.inDays / 30).floor();
+    if (months < 12) return "$months bulan lalu";
+    final years = (diff.inDays / 365).floor();
+    return "$years tahun lalu";
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -589,31 +655,50 @@ class _UlasanTab extends StatelessWidget {
         }
 
         final docs = snapshot.data?.docs ?? [];
-
         if (docs.isEmpty) {
           return Center(
             child: Text("Belum ada ulasan", style: TextStyle(fontSize: 13.sp)),
           );
         }
 
-        final ratings = docs
-            .map((d) => (d['rating'] ?? 0) as num)
+        final ratingNums = docs
+            .map(
+              (d) => d['rating'] is num ? (d['rating'] as num).toDouble() : 0.0,
+            )
             .toList(growable: false);
-        final avgRating = ratings.isEmpty
+
+        final avgRating = ratingNums.isEmpty
             ? 0.0
-            : ratings.reduce((a, b) => a + b) / ratings.length;
+            : ratingNums.reduce((a, b) => a + b) / ratingNums.length;
+
+        final counts = List<int>.filled(6, 0);
+        for (final r in ratingNums) {
+          final star = r.round().clamp(1, 5);
+          counts[star] += 1;
+        }
 
         return ListView(
           padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 100.h),
           children: [
-            _RatingSummary(average: avgRating, total: ratings.length),
+            _RatingSummary(
+              average: avgRating,
+              total: ratingNums.length,
+              starCounts: counts,
+            ),
             SizedBox(height: 20.h),
             for (final d in docs) ...[
               _ReviewCard(
-                name: d['namaUser'] ?? 'Anonim',
-                rating: (d['rating'] ?? 0) as int,
-                timeAgo: "",
-                text: d['komentar'] ?? '',
+                name: (d['namaUser'] ?? 'Anonim').toString(),
+                rating: d['rating'] is num
+                    ? (d['rating'] as num).toDouble()
+                    : 0.0,
+                timeAgo: () {
+                  final createdAt = d['createdAt'];
+                  if (createdAt is Timestamp)
+                    return _timeAgo(createdAt.toDate());
+                  return "";
+                }(),
+                text: (d['komentar'] ?? '').toString(),
               ),
               const Divider(height: 30),
             ],
@@ -627,11 +712,18 @@ class _UlasanTab extends StatelessWidget {
 class _RatingSummary extends StatelessWidget {
   final double average;
   final int total;
+  final List<int> starCounts;
 
-  const _RatingSummary({required this.average, required this.total});
+  const _RatingSummary({
+    required this.average,
+    required this.total,
+    required this.starCounts,
+  });
 
   @override
   Widget build(BuildContext context) {
+    double ratio(int count) => total == 0 ? 0.0 : count / total;
+
     Widget bar(double v) {
       return LinearProgressIndicator(
         value: v,
@@ -659,15 +751,15 @@ class _RatingSummary extends StatelessWidget {
           Expanded(
             child: Column(
               children: [
-                _RatingRow(label: "5", bar: bar(0.9)),
+                _RatingRow(label: "5", bar: bar(ratio(starCounts[5]))),
                 SizedBox(height: 4.h),
-                _RatingRow(label: "4", bar: bar(0.6)),
+                _RatingRow(label: "4", bar: bar(ratio(starCounts[4]))),
                 SizedBox(height: 4.h),
-                _RatingRow(label: "3", bar: bar(0.3)),
+                _RatingRow(label: "3", bar: bar(ratio(starCounts[3]))),
                 SizedBox(height: 4.h),
-                _RatingRow(label: "2", bar: bar(0.1)),
+                _RatingRow(label: "2", bar: bar(ratio(starCounts[2]))),
                 SizedBox(height: 4.h),
-                _RatingRow(label: "1", bar: bar(0.05)),
+                _RatingRow(label: "1", bar: bar(ratio(starCounts[1]))),
               ],
             ),
           ),
@@ -708,6 +800,7 @@ class _RatingSummary extends StatelessWidget {
 class _RatingRow extends StatelessWidget {
   final String label;
   final Widget bar;
+
   const _RatingRow({required this.label, required this.bar});
 
   @override
@@ -726,7 +819,7 @@ class _RatingRow extends StatelessWidget {
 
 class _ReviewCard extends StatelessWidget {
   final String name;
-  final int rating;
+  final double rating;
   final String timeAgo;
   final String text;
 
@@ -739,6 +832,8 @@ class _ReviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final filled = rating.round().clamp(0, 5);
+
     return Column(
       children: [
         Row(
@@ -768,7 +863,7 @@ class _ReviewCard extends StatelessWidget {
                           (i) => Icon(
                             Icons.star_rounded,
                             size: 14,
-                            color: i < rating
+                            color: i < filled
                                 ? Colors.orange
                                 : Colors.grey[300],
                           ),
@@ -802,16 +897,152 @@ class _ReviewCard extends StatelessWidget {
 }
 
 ///////////////////////////////////////////////////////////////////////////
-/// BOTTOM BUTTON
+/// BOTTOM BUTTON (Smart)
 ///////////////////////////////////////////////////////////////////////////
 
 class _BottomActionBar extends StatelessWidget {
   final Bengkel bengkel;
+  final ValueNotifier<List<LayananItem>> selectedLayanan;
 
-  const _BottomActionBar({required this.bengkel});
+  const _BottomActionBar({
+    required this.bengkel,
+    required this.selectedLayanan,
+  });
+
+  Stream<bool> _canChatStream(String uid) {
+    if (bengkel.id.trim().isEmpty) return Stream.value(false);
+
+    final query = FirebaseFirestore.instance
+        .collection('bookings')
+        .where('userId', isEqualTo: uid)
+        .where('bengkelId', isEqualTo: bengkel.id)
+        .limit(1);
+
+    return query.snapshots(includeMetadataChanges: true).map((snap) {
+      if (snap.metadata.isFromCache) return false;
+      return snap.docs.isNotEmpty;
+    });
+  }
+
+  /// ✅ FIX: implement buka chat (tanpa query/index)
+  Future<void> _openChat(BuildContext context, User user) async {
+    if (bengkel.id.trim().isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Bengkel belum punya ID.")));
+      return;
+    }
+
+    // chatId deterministik -> gak perlu query Firestore
+    final chatId = "bengkel_${bengkel.id}_${user.uid}";
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChatRoomPage(
+          chatId: chatId,
+          title: bengkel.nama,
+          bengkelId: bengkel.id,
+        ),
+      ),
+    );
+  }
+
+  void _showPickServiceDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28.r),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.18),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Pilih layanan",
+                  style: TextStyle(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                  ),
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  "Silakan pilih minimal satu layanan.",
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    color: Colors.grey[700],
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 24.h),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44.h,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFDB0C0C),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20.r),
+                      ),
+                    ),
+                    child: Text(
+                      "OK",
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return _buildBar(context, canChat: false, user: null);
+
+    return StreamBuilder<bool>(
+      stream: _canChatStream(user.uid),
+      initialData: false,
+      builder: (context, snap) {
+        final canChat = (snap.hasError) ? false : (snap.data ?? false);
+        return _buildBar(context, canChat: canChat, user: user);
+      },
+    );
+  }
+
+  Widget _buildBar(
+    BuildContext context, {
+    required bool canChat,
+    required User? user,
+  }) {
+    final chatEnabled = canChat && user != null;
+
     return Container(
       padding: EdgeInsets.fromLTRB(
         16.w,
@@ -833,11 +1064,17 @@ class _BottomActionBar extends StatelessWidget {
         children: [
           Expanded(
             child: OutlinedButton(
-              onPressed: () {
-                // TODO: arahkan ke chat bengkel
-              },
+              onPressed: chatEnabled ? () => _openChat(context, user) : null,
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFDB0C0C), width: 1.4),
+                backgroundColor: chatEnabled
+                    ? Colors.transparent
+                    : Colors.grey.shade200,
+                side: BorderSide(
+                  color: chatEnabled
+                      ? const Color(0xFFDB0C0C)
+                      : Colors.grey.shade400,
+                  width: 1.4,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(24.r),
                 ),
@@ -846,10 +1083,12 @@ class _BottomActionBar extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.chat_bubble_outline,
                     size: 18,
-                    color: Color(0xFFDB0C0C),
+                    color: chatEnabled
+                        ? const Color(0xFFDB0C0C)
+                        : Colors.grey.shade600,
                   ),
                   SizedBox(width: 6.w),
                   Text(
@@ -857,110 +1096,78 @@ class _BottomActionBar extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w600,
-                      color: const Color(0xFFDB0C0C),
+                      color: chatEnabled
+                          ? const Color(0xFFDB0C0C)
+                          : Colors.grey.shade600,
                     ),
                   ),
+                  if (!chatEnabled) ...[
+                    SizedBox(width: 6.w),
+                    Icon(
+                      Icons.lock_outline,
+                      size: 16,
+                      color: Colors.grey.shade600,
+                    ),
+                  ],
                 ],
               ),
             ),
           ),
           SizedBox(width: 10.w),
-
-          // === TOMBOL BOOKING SEKARANG ===
           Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  barrierDismissible: true, // bisa tutup tap di luar
-                  builder: (ctx) {
-                    return Dialog(
-                      backgroundColor:
-                          Colors.transparent, // biar bisa kasih shadow custom
-                      insetPadding: EdgeInsets.symmetric(horizontal: 24.w),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(28.r),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.18),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        padding: EdgeInsets.fromLTRB(20.w, 24.h, 20.w, 20.h),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // judul
-                            Text(
-                              "Pilih layanan dulu",
-                              style: TextStyle(
-                                fontSize: 18.sp,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            SizedBox(height: 12.h),
+            child: ValueListenableBuilder<List<LayananItem>>(
+              valueListenable: selectedLayanan,
+              builder: (context, list, _) {
+                final hasSelected = list.isNotEmpty;
 
-                            // deskripsi
-                            Text(
-                              "Silakan pilih minimal satu"
-                              "layanan sebelum melakukan booking.",
-                              style: TextStyle(
-                                fontSize: 13.sp,
-                                color: Colors.grey[700],
-                                height: 1.4,
-                              ),
-                            ),
+                return ElevatedButton(
+                  onPressed: () async {
+                    if (!hasSelected) {
+                      final tab = DefaultTabController.of(context);
+                      if (tab != null) {
+                        tab.animateTo(1);
+                      } else {
+                        _showPickServiceDialog(context);
+                      }
+                      return;
+                    }
 
-                            SizedBox(height: 24.h),
-
-                            // tombol kuning lebar
-                            SizedBox(
-                              width: double.infinity,
-                              height: 44.h,
-                              child: ElevatedButton(
-                                onPressed: () => Navigator.pop(ctx),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFDB0C0C),
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20.r),
-                                  ),
-                                ),
-                                child: Text(
-                                  "OK",
-                                  style: TextStyle(
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                    final result = await Navigator.push<List<LayananItem>>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BookingSummaryPage(
+                          bengkel: bengkel,
+                          layananDipilih: List<LayananItem>.from(list),
                         ),
                       ),
                     );
+
+                    if (result != null) {
+                      selectedLayanan.value = result;
+
+                      if (result.isEmpty) {
+                        final tab = DefaultTabController.of(context);
+                        tab.animateTo(1);
+                      }
+                    }
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFD740),
+                    foregroundColor: Colors.black87,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24.r),
+                    ),
+                    padding: EdgeInsets.symmetric(vertical: 10.h),
+                  ),
+                  child: Text(
+                    hasSelected ? "Booking Sekarang" : "Pilih Layanan",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.sp,
+                    ),
+                  ),
                 );
               },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFD740),
-                foregroundColor: Colors.black87,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24.r),
-                ),
-                padding: EdgeInsets.symmetric(vertical: 10.h),
-              ),
-              child: Text(
-                "Booking Sekarang",
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp),
-              ),
             ),
           ),
         ],

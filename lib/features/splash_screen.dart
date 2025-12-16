@@ -1,5 +1,5 @@
 // ignore_for_file: unnecessary_underscores
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -21,59 +21,53 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<double> _scaleAnimation;
   late final Animation<double> _fadeAnimation;
 
+  Timer? _navTimer;
+
+  @override
+  void didChangeDependencies() {
+    precacheImage(const AssetImage('assets/logo.png'), context);
+    super.didChangeDependencies();
+  }
+
   @override
   void initState() {
     super.initState();
-
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     );
-
     _scaleAnimation = CurvedAnimation(
       parent: _controller,
       curve: Curves.easeOutBack,
     );
-
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
 
     _controller.forward();
 
-    // Setelah 3 detik, tentukan harus ke mana
-    Future.delayed(const Duration(seconds: 3), () async {
+    _navTimer = Timer(const Duration(seconds: 3), () async {
       if (!mounted) return;
 
       final dest = await AuthService.instance.resolveStartDestination();
-
       if (!mounted) return;
 
-      Widget page;
-      switch (dest) {
-        case AuthStartDestination.onboarding:
-          page = const OnboardingScreen();
-          break;
-        case AuthStartDestination.vehicleForm:
-          page = const VehicleFormScreen();
-          break;
-        case AuthStartDestination.home:
-          page = const HomeDashboard();
-          break;
-      }
+      final page = switch (dest) {
+        AuthStartDestination.onboarding => const OnboardingScreen(),
+        AuthStartDestination.vehicleForm => const VehicleFormScreen(),
+        AuthStartDestination.home => const HomeDashboard(),
+      };
 
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
           transitionDuration: const Duration(milliseconds: 800),
           pageBuilder: (_, __, ___) => page,
-          transitionsBuilder: (_, animation, __, child) {
-            return FadeTransition(
-              opacity: CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeInOut,
-              ),
-              child: child,
-            );
-          },
+          transitionsBuilder: (_, animation, __, child) => FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOut,
+            ),
+            child: child,
+          ),
         ),
       );
     });
@@ -81,6 +75,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _navTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

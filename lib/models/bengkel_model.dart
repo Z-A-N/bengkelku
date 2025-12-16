@@ -1,3 +1,5 @@
+// ignore_for_file: non_constant_identifier_names
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Bengkel {
@@ -22,23 +24,27 @@ class Bengkel {
     required this.foto,
     required this.telepon,
     required this.lokasi,
-    required this.jamOperasional,
+    required this.jamOperasional,BengkelDetailPage
   });
 
   factory Bengkel.fromDoc(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>? ?? {};
+  final data = (doc.data() as Map<String, dynamic>?) ?? {};
 
-    return Bengkel(
-      id: doc.id,
-      nama: data['nama'] ?? '-',
-      alamat: data['alamat'] ?? '-',
-      deskripsi: data['deskripsi'] ?? '',
-      rating: (data['rating'] ?? 0).toDouble(),
-      buka: data['buka'] ?? false,
-      foto: data['foto'] ?? '',
-      telepon: data['telepon'],
-      lokasi: data['lokasi'] as GeoPoint? ?? const GeoPoint(0, 0),
-      jamOperasional: (data['jam_operasional'] as Map<String, dynamic>?) ?? {},
-    );
-  }
+  final ratingRaw = data['rating'];
+  final rating = ratingRaw is num ? ratingRaw.toDouble() : 0.0;
+
+  return Bengkel(
+    id: doc.id,
+    nama: (data['nama'] ?? '-') as String,
+    alamat: (data['alamat'] ?? '-') as String,
+    deskripsi: (data['deskripsi'] ?? '') as String,
+    rating: rating,
+    buka: (data['buka'] ?? false) as bool,
+    foto: (data['foto'] ?? '') as String,
+    telepon: (data['telepon'] ?? '-') as String,
+    lokasi: data['lokasi'] is GeoPoint ? data['lokasi'] as GeoPoint : const GeoPoint(0, 0),
+    jamOperasional: (data['jam_operasional'] as Map<String, dynamic>?) ?? {},
+  );
+}
+
 }
